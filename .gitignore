@@ -1,0 +1,28 @@
+# Gradle
+.gradle/
+build/
+
+# Local configuration
+local.properties
+
+# IntelliJ / Android Studio / misc IDEs (even if you don't use Studio)
+.idea/
+*.iml
+
+# Kotlin / Java
+*.class
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Android
+*.apk
+*.aab
+
+# Keystores (NEVER COMMIT)
+*.jks
+*.keystore

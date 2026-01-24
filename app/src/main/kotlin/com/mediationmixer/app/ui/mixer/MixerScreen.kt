@@ -1,0 +1,422 @@
+package com.mediationmixer.app.ui.mixer
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Loop
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Nature
+import androidx.compose.material.icons.filled.Save
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.meditationmixer.core.domain.model.LayerType
+import com.meditationmixer.core.ui.components.NeumorphicButton
+import com.meditationmixer.core.ui.components.NeumorphicCard
+import com.meditationmixer.core.ui.components.NeumorphicSlider
+import com.meditationmixer.core.ui.theme.MeditationColors
+
+@Composable
+fun MixerScreen(
+    onNavigateBack: () -> Unit,
+    viewModel: MixerViewModel = hiltViewModel()
+) {
+    val uiState by viewModel.uiState.collectAsState()
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MeditationColors.backgroundGradient)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp)
+        ) {
+            // Header
+            MixerHeader(
+                presetName = uiState.presetName,
+                isFavorite = uiState.isFavorite,
+                onBackClick = onNavigateBack,
+                onFavoriteClick = viewModel::toggleFavorite
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Visual preview
+            MixerVisual(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp)
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Layer controls
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Tone Generator Layer
+                LayerCard(
+                    icon = Icons.Default.GraphicEq,
+                    title = "Tone Generator",
+                    subtitle = "${uiState.toneFrequency.toInt()} Hz",
+                    volume = uiState.toneVolume,
+                    isLooping = true,
+                    showLoop = false,
+                    onVolumeChange = viewModel::setToneVolume,
+                    onLoopToggle = { },
+                    extraContent = {
+                        FrequencySlider(
+                            frequency = uiState.toneFrequency,
+                            onFrequencyChange = viewModel::setToneFrequency
+                        )
+                    }
+                )
+
+                // User Audio Layer
+                LayerCard(
+                    icon = Icons.Default.MusicNote,
+                    title = "Your Audio",
+                    subtitle = uiState.userAudioName ?: "Tap to import",
+                    volume = uiState.userAudioVolume,
+                    isLooping = uiState.userAudioLoop,
+                    showLoop = uiState.userAudioName != null,
+                    onVolumeChange = viewModel::setUserAudioVolume,
+                    onLoopToggle = viewModel::toggleUserAudioLoop,
+                    onCardClick = viewModel::importUserAudio
+                )
+
+                // Ambience Layer
+                LayerCard(
+                    icon = Icons.Default.Nature,
+                    title = "Ambience",
+                    subtitle = uiState.ambienceName ?: "Rain Sounds",
+                    volume = uiState.ambienceVolume,
+                    isLooping = uiState.ambienceLoop,
+                    showLoop = true,
+                    onVolumeChange = viewModel::setAmbienceVolume,
+                    onLoopToggle = viewModel::toggleAmbienceLoop,
+                    onCardClick = viewModel::selectAmbience
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Save preset button
+            SavePresetButton(
+                onClick = viewModel::savePreset
+            )
+        }
+    }
+}
+
+@Composable
+private fun MixerHeader(
+    presetName: String,
+    isFavorite: Boolean,
+    onBackClick: () -> Unit,
+    onFavoriteClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        NeumorphicButton(
+            onClick = onBackClick,
+            modifier = Modifier.size(48.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ArrowBack,
+                    contentDescription = "Back",
+                    tint = MeditationColors.textMuted,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+
+        Text(
+            text = presetName.uppercase(),
+            color = MeditationColors.textMuted,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+            letterSpacing = 2.sp
+        )
+
+        NeumorphicButton(
+            onClick = onFavoriteClick,
+            isPressed = isFavorite,
+            modifier = Modifier.size(48.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    contentDescription = "Favorite",
+                    tint = if (isFavorite) MeditationColors.accentPrimary else MeditationColors.textMuted,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MixerVisual(
+    modifier: Modifier = Modifier
+) {
+    NeumorphicCard(
+        modifier = modifier
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Placeholder for audio visualization
+            repeat(12) {
+                Box(
+                    modifier = Modifier
+                        .width(8.dp)
+                        .height((20 + (Math.random() * 60).toInt()).dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(MeditationColors.accentGradient)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LayerCard(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    volume: Float,
+    isLooping: Boolean,
+    showLoop: Boolean,
+    onVolumeChange: (Float) -> Unit,
+    onLoopToggle: () -> Unit,
+    onCardClick: (() -> Unit)? = null,
+    extraContent: (@Composable () -> Unit)? = null,
+    modifier: Modifier = Modifier
+) {
+    NeumorphicCard(
+        modifier = modifier.fillMaxWidth(),
+        onClick = onCardClick
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = MeditationColors.accentPrimary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = title,
+                            color = MeditationColors.textPrimary,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = subtitle,
+                            color = MeditationColors.textMuted,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+
+                if (showLoop) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Loop,
+                            contentDescription = "Loop",
+                            tint = if (isLooping) MeditationColors.accentPrimary else MeditationColors.textMuted,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Switch(
+                            checked = isLooping,
+                            onCheckedChange = { onLoopToggle() },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = MeditationColors.accentPrimary,
+                                checkedTrackColor = MeditationColors.accentDark,
+                                uncheckedThumbColor = MeditationColors.textMuted,
+                                uncheckedTrackColor = MeditationColors.surfaceDark
+                            )
+                        )
+                    }
+                }
+            }
+
+            extraContent?.invoke()
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Vol",
+                    color = MeditationColors.textMuted,
+                    fontSize = 12.sp
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                NeumorphicSlider(
+                    value = volume,
+                    onValueChange = onVolumeChange,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "${(volume * 100).toInt()}%",
+                    color = MeditationColors.textMuted,
+                    fontSize = 12.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FrequencySlider(
+    frequency: Float,
+    onFrequencyChange: (Float) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier.padding(top = 12.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "Frequency",
+                color = MeditationColors.textMuted,
+                fontSize = 12.sp
+            )
+            Text(
+                text = "${frequency.toInt()} Hz",
+                color = MeditationColors.accentPrimary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        NeumorphicSlider(
+            value = (frequency - 1f) / 39f, // 1-40 Hz range
+            onValueChange = { onFrequencyChange(it * 39f + 1f) },
+            modifier = Modifier.fillMaxWidth()
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(text = "1 Hz", color = MeditationColors.textMuted, fontSize = 10.sp)
+            Text(text = "Delta", color = MeditationColors.textMuted, fontSize = 10.sp)
+            Text(text = "Theta", color = MeditationColors.textMuted, fontSize = 10.sp)
+            Text(text = "Alpha", color = MeditationColors.textMuted, fontSize = 10.sp)
+            Text(text = "40 Hz", color = MeditationColors.textMuted, fontSize = 10.sp)
+        }
+    }
+}
+
+@Composable
+private fun SavePresetButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    NeumorphicButton(
+        onClick = onClick,
+        modifier = modifier
+            .fillMaxWidth()
+            .height(56.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(RoundedCornerShape(28.dp))
+                .background(MeditationColors.buttonGradient),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.Save,
+                contentDescription = null,
+                tint = MeditationColors.textPrimary,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Save Preset",
+                color = MeditationColors.textPrimary,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}

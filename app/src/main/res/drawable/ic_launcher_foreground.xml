@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Outer circle -->
+    <path
+        android:fillColor="#EA5610"
+        android:pathData="M54,27c14.91,0 27,12.09 27,27s-12.09,27 -27,27 -27,-12.09 -27,-27 12.09,-27 27,-27z"/>
+    <!-- Inner circle -->
+    <path
+        android:fillColor="#25272A"
+        android:pathData="M54,35c10.49,0 19,8.51 19,19s-8.51,19 -19,19 -19,-8.51 -19,-19 8.51,-19 19,-19z"/>
+    <!-- Wave pattern -->
+    <path
+        android:fillColor="#EA5610"
+        android:pathData="M42,54c0,-6.63 5.37,-12 12,-12s12,5.37 12,12"
+        android:strokeWidth="2"
+        android:strokeColor="#EA5610"/>
+    <path
+        android:fillColor="#EA5610"
+        android:pathData="M46,54c0,-4.42 3.58,-8 8,-8s8,3.58 8,8"
+        android:strokeWidth="2"
+        android:strokeColor="#EA5610"/>
+    <path
+        android:fillColor="#EA5610"
+        android:pathData="M50,54c0,-2.21 1.79,-4 4,-4s4,1.79 4,4"
+        android:strokeWidth="2"
+        android:strokeColor="#EA5610"/>
+</vector>

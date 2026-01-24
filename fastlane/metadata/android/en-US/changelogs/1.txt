@@ -1,0 +1,13 @@
+Initial release of Meditation Mixer
+
+Features:
+• Tone generator with frequency presets (Delta, Theta, Alpha, Beta)
+• Audio layer mixing with volume controls
+• Import your own audio files
+• Built-in ambient sounds
+• Session timer with fade-out
+• Preset save/load
+• Streak tracking and achievements
+• Neumorphic dark UI
+• Background playback with notification controls
+• Completely offline, no tracking

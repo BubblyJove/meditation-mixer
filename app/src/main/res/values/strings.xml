@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Meditation Mixer</string>
+    
+    <!-- Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_mixer">Mixer</string>
+    <string name="nav_library">Library</string>
+    <string name="nav_streaks">Streaks</string>
+    <string name="nav_settings">Settings</string>
+    
+    <!-- Home Screen -->
+    <string name="start_night_session">Start Night Session</string>
+    <string name="stop_session">Stop Session</string>
+    <string name="choose_preset">Choose Preset</string>
+    <string name="current_streak">Current Streak</string>
+    <string name="nights">nights</string>
+    
+    <!-- Mixer Screen -->
+    <string name="mixer_title">Mix Your Session</string>
+    <string name="tone_layer">Tone Generator</string>
+    <string name="frequency_hz">Frequency (Hz)</string>
+    <string name="user_audio_layer">Your Audio</string>
+    <string name="ambience_layer">Ambience</string>
+    <string name="import_audio">Import Audio</string>
+    <string name="loop_enabled">Loop</string>
+    <string name="volume">Volume</string>
+    <string name="save_preset">Save Preset</string>
+    <string name="preset_name">Preset Name</string>
+    
+    <!-- Timer -->
+    <string name="timer">Timer</string>
+    <string name="timer_15">15 min</string>
+    <string name="timer_30">30 min</string>
+    <string name="timer_60">60 min</string>
+    <string name="timer_90">90 min</string>
+    <string name="timer_custom">Custom</string>
+    <string name="fade_out">Fade Out</string>
+    <string name="fade_duration">Fade Duration</string>
+    
+    <!-- Presets -->
+    <string name="sleep_starter">Sleep Starter</string>
+    <string name="deep_relaxation">Deep Relaxation</string>
+    <string name="focus_mode">Focus Mode</string>
+    
+    <!-- Frequency Presets -->
+    <string name="delta_2hz">Delta 2Hz</string>
+    <string name="theta_4hz">Theta 4Hz</string>
+    <string name="theta_6hz">Theta 6Hz</string>
+    <string name="alpha_10hz">Alpha 10Hz</string>
+    <string name="beta_20hz">Beta 20Hz</string>
+    
+    <!-- Achievements -->
+    <string name="achievements">Achievements</string>
+    <string name="achievement_first_night">First Night</string>
+    <string name="achievement_first_night_desc">Complete your first session</string>
+    <string name="achievement_weekender">Weekender</string>
+    <string name="achievement_weekender_desc">Complete 7 sessions</string>
+    <string name="achievement_builder">Builder</string>
+    <string name="achievement_builder_desc">Save your first preset</string>
+    <string name="achievement_importer">Importer</string>
+    <string name="achievement_importer_desc">Import your first audio file</string>
+    <string name="achievement_consistent">Consistent</string>
+    <string name="achievement_consistent_desc">3 nights in a row</string>
+    
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="reminder_toggle">Daily Reminder</string>
+    <string name="reminder_time">Reminder Time</string>
+    <string name="default_fade_duration">Default Fade Duration</string>
+    <string name="support_development">Support Development</string>
+    <string name="disclaimer_title">Disclaimer</string>
+    <string name="disclaimer_text">This app is for relaxation purposes only and is not intended to diagnose, treat, cure, or prevent any medical condition. Please listen at a comfortable volume. Consult a healthcare professional for sleep disorders or health concerns.</string>
+    <string name="privacy_policy">Privacy Policy</string>
+    <string name="privacy_text">Meditation Mixer respects your privacy. No data leaves your device. No analytics, no tracking, no accounts.</string>
+    <string name="version">Version</string>
+    
+    <!-- Notifications -->
+    <string name="notification_channel_playback">Playback</string>
+    <string name="notification_channel_playback_desc">Audio playback controls</string>
+    <string name="notification_playing">Playing meditation session</string>
+    
+    <!-- Errors -->
+    <string name="error_audio_load">Could not load audio file</string>
+    <string name="error_permission_denied">Permission denied</string>
+</resources>

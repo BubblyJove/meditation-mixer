@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Neumorphic Dark Theme Colors -->
+    <color name="background_dark">#25272A</color>
+    <color name="surface_dark">#1E2024</color>
+    <color name="surface_elevated">#2B2F34</color>
+    
+    <!-- Neumorphic shadows -->
+    <color name="neu_dark">#090A0C</color>
+    <color name="neu_light">#3E434C</color>
+    
+    <!-- Accent (Orange gradient) -->
+    <color name="accent_primary">#EA5610</color>
+    <color name="accent_secondary">#D94D07</color>
+    <color name="accent_dark">#B43613</color>
+    
+    <!-- Text colors -->
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#BFBFBF</color>
+    <color name="text_muted">#808080</color>
+    
+    <!-- Slider track gradient -->
+    <color name="slider_start">#D93D07</color>
+    <color name="slider_end">#937114</color>
+</resources>

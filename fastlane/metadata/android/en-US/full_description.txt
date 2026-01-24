@@ -1,0 +1,33 @@
+Meditation Mixer is a privacy-first Android app designed to help you relax, meditate, and sleep better.
+
+FEATURES:
+
+🎵 Tone Generator
+Generate sine wave frequencies from 1-40 Hz. Choose from preset frequencies like Delta (2Hz) for deep sleep, Theta (4-6Hz) for meditation, or Alpha (10Hz) for relaxation.
+
+🎧 Audio Mixer
+Layer multiple audio sources with individual volume controls:
+• Tone generator for frequency-based relaxation
+• Your own audio files (affirmations, music, etc.)
+• Built-in ambient sounds (rain, ocean, forest, wind)
+
+⏱️ Smart Timer
+Set session timers from 15 minutes to 2 hours, with a configurable fade-out that gently reduces volume as your session ends.
+
+💾 Presets
+Save your favorite mix configurations and start your night session with a single tap.
+
+🔥 Streak Tracking
+Build healthy habits with local-only streak tracking and achievements. No accounts, no cloud sync—just simple motivation.
+
+🔒 PRIVACY FIRST
+• No analytics or tracking
+• No user accounts required
+• Works completely offline
+• No data leaves your device
+• Minimal permissions
+
+DISCLAIMER:
+This app is for relaxation purposes only and is not intended to diagnose, treat, cure, or prevent any medical condition. Please listen at a comfortable volume.
+
+Open source and free forever. Support development through optional donations.

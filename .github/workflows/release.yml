@@ -1,0 +1,77 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses
+
+      - name: Install Android SDK packages
+        run: sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+      
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+      
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+      
+      - name: Run tests
+        run: ./gradlew testReleaseUnitTest --no-daemon
+      
+      - name: Build release APK
+        run: ./gradlew assembleRelease --no-daemon
+      
+      - name: Get version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Release ${{ steps.get_version.outputs.VERSION }}
+          draft: false
+          prerelease: false
+          files: |
+            app/build/outputs/apk/release/app-release-unsigned.apk
+          body: |
+            ## Meditation Mixer v${{ steps.get_version.outputs.VERSION }}
+            
+            ### Installation
+            1. Download the APK file below
+            2. Enable "Install from unknown sources" in your Android settings
+            3. Open the APK file to install
+            
+            ### What's New
+            See [CHANGELOG.md](CHANGELOG.md) for details.
+            
+            ---
+            *This is an unsigned release build. For signed releases, see F-Droid.*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
