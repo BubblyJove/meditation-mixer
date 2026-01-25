@@ -20,6 +20,8 @@ interface AudioEngine {
     suspend fun setMasterVolume(volume: Float)
     suspend fun setLayerVolume(type: LayerType, volume: Float)
     suspend fun setLayerLoop(type: LayerType, loop: Boolean)
+    suspend fun setLayerEnabled(type: LayerType, enabled: Boolean)
+    suspend fun setLayerStartOffset(type: LayerType, startOffsetMs: Long)
     suspend fun updateToneFrequency(frequencyHz: Float)
     
     suspend fun fadeOut(durationMs: Long)

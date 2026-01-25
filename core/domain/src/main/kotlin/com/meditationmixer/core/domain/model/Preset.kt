@@ -13,6 +13,7 @@ data class Preset(
 
 data class LayerConfig(
     val type: LayerType,
+    val enabled: Boolean = true,
     val sourceUri: String? = null,
     val assetId: String? = null,
     val volume: Float = 0.5f,

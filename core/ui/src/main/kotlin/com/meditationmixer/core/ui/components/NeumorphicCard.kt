@@ -1,5 +1,8 @@
 package com.meditationmixer.core.ui.components
 
+import android.graphics.BlurMaskFilter
+import android.graphics.Paint as AndroidPaint
+import android.graphics.RectF
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -12,13 +15,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.meditationmixer.core.ui.theme.MeditationColors
@@ -37,15 +39,15 @@ fun NeumorphicCard(
     
     Box(
         modifier = modifier
-            .clip(shape)
-            .background(
-                if (isPressed) MeditationColors.surfaceGradient
-                else MeditationColors.buttonWrapperGradient
-            )
             .neumorphicCardShadow(
                 isPressed = isPressed,
                 cornerRadius = cornerRadius,
                 isCircular = isCircular
+            )
+            .clip(shape)
+            .background(
+                if (isPressed) MeditationColors.surfaceGradient
+                else MeditationColors.buttonWrapperGradient
             )
             .then(
                 if (onClick != null) {
@@ -76,43 +78,65 @@ fun Modifier.neumorphicCardShadow(
     cornerRadius: Dp = 20.dp,
     isCircular: Boolean = false,
     lightColor: Color = MeditationColors.neuShadowLight.copy(alpha = 0.3f),
-    darkColor: Color = MeditationColors.neuShadowDark.copy(alpha = 0.5f)
-): Modifier = this.drawWithContent {
-    drawContent()
-    
+    darkColor: Color = MeditationColors.neuShadowDark.copy(alpha = 0.5f),
+    shadowRadius: Dp = 10.dp
+): Modifier = this.drawBehind {
     if (!isPressed) {
-        // Draw subtle inner highlight on top-left
-        drawRoundRect(
-            color = lightColor,
-            topLeft = Offset(-2.dp.toPx(), -2.dp.toPx()),
-            size = size.copy(
-                width = size.width + 4.dp.toPx(),
-                height = size.height + 4.dp.toPx()
-            ),
-            cornerRadius = if (isCircular) {
-                CornerRadius(size.minDimension / 2)
+        val blurPx = shadowRadius.toPx().coerceAtLeast(1f)
+        val offsetPx = blurPx / 2f
+
+        val darkPaint = AndroidPaint().apply {
+            isAntiAlias = true
+            color = darkColor.toArgb()
+            maskFilter = BlurMaskFilter(blurPx, BlurMaskFilter.Blur.NORMAL)
+        }
+        val lightPaint = AndroidPaint().apply {
+            isAntiAlias = true
+            color = lightColor.toArgb()
+            maskFilter = BlurMaskFilter(blurPx, BlurMaskFilter.Blur.NORMAL)
+        }
+
+        drawIntoCanvas { canvas ->
+            val nativeCanvas = canvas.nativeCanvas
+
+            if (isCircular) {
+                val radius = size.minDimension / 2f
+
+                nativeCanvas.drawCircle(
+                    center.x + offsetPx,
+                    center.y + offsetPx,
+                    radius,
+                    darkPaint
+                )
+                nativeCanvas.drawCircle(
+                    center.x - offsetPx,
+                    center.y - offsetPx,
+                    radius,
+                    lightPaint
+                )
             } else {
-                CornerRadius(cornerRadius.toPx())
-            },
-            style = Stroke(width = 1.dp.toPx()),
-            blendMode = BlendMode.Overlay
-        )
-    } else {
-        // Draw inset shadow effect
-        drawRoundRect(
-            color = darkColor,
-            topLeft = Offset(2.dp.toPx(), 2.dp.toPx()),
-            size = size.copy(
-                width = size.width - 4.dp.toPx(),
-                height = size.height - 4.dp.toPx()
-            ),
-            cornerRadius = if (isCircular) {
-                CornerRadius(size.minDimension / 2)
-            } else {
-                CornerRadius(cornerRadius.toPx())
-            },
-            style = Stroke(width = 2.dp.toPx()),
-            blendMode = BlendMode.Overlay
-        )
+                val r = cornerRadius.toPx().coerceAtLeast(0f)
+                val rect = RectF(0f, 0f, size.width, size.height)
+
+                nativeCanvas.drawRoundRect(
+                    rect.left + offsetPx,
+                    rect.top + offsetPx,
+                    rect.right + offsetPx,
+                    rect.bottom + offsetPx,
+                    r,
+                    r,
+                    darkPaint
+                )
+                nativeCanvas.drawRoundRect(
+                    rect.left - offsetPx,
+                    rect.top - offsetPx,
+                    rect.right - offsetPx,
+                    rect.bottom - offsetPx,
+                    r,
+                    r,
+                    lightPaint
+                )
+            }
+        }
     }
 }

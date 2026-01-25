@@ -86,15 +86,25 @@ class LibraryViewModel @Inject constructor(
             } else {
                 val ambience = _uiState.value.ambienceList.find { it.id == ambienceId }
                 ambience?.let {
-                    previewAmbience(it.assetPath)
-                    _uiState.update { state -> state.copy(playingId = ambienceId) }
+                    runCatching {
+                        previewAmbience(it.assetPath)
+                    }.onSuccess {
+                        _uiState.update { state -> state.copy(playingId = ambienceId) }
+                    }.onFailure {
+                        _uiState.update { state -> state.copy(playingId = null, errorMessage = "Missing ambience audio files") }
+                    }
                 }
             }
         }
+    }
+
+    fun consumeError() {
+        _uiState.update { it.copy(errorMessage = null) }
     }
 }
 
 data class LibraryUiState(
     val ambienceList: List<AmbienceItemData> = emptyList(),
-    val playingId: String? = null
+    val playingId: String? = null,
+    val errorMessage: String? = null
 )

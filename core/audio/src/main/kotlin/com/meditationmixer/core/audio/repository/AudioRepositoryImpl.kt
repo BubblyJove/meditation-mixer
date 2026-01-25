@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import com.meditationmixer.core.audio.engine.AudioEngine
+import com.meditationmixer.core.audio.engine.NoiseGenerator
+import com.meditationmixer.core.audio.engine.ToneGenerator
 import com.meditationmixer.core.domain.model.LayerConfig
 import com.meditationmixer.core.domain.model.LayerType
 import com.meditationmixer.core.domain.repository.AudioRepository
@@ -22,6 +24,8 @@ class AudioRepositoryImpl @Inject constructor(
     
     private val _masterVolume = MutableStateFlow(1.0f)
     private var previewPlayer: ExoPlayer? = null
+    private val previewToneGenerator = ToneGenerator()
+    private val previewNoiseGenerator = NoiseGenerator()
     
     private val layerConfigs = mutableMapOf<LayerType, MutableStateFlow<LayerConfig>>()
     
@@ -47,25 +51,31 @@ class AudioRepositoryImpl @Inject constructor(
     
     override suspend fun updateLayer(
         type: LayerType,
+        enabled: Boolean?,
         volume: Float?,
         loop: Boolean?,
         sourceUri: String?,
         assetId: String?,
-        frequency: Float?
+        frequency: Float?,
+        startOffsetMs: Long?
     ) {
         val currentConfig = layerConfigs[type]?.value ?: LayerConfig(type = type)
         val updatedConfig = currentConfig.copy(
+            enabled = enabled ?: currentConfig.enabled,
             volume = volume ?: currentConfig.volume,
             loop = loop ?: currentConfig.loop,
             sourceUri = sourceUri ?: currentConfig.sourceUri,
             assetId = assetId ?: currentConfig.assetId,
-            frequency = frequency ?: currentConfig.frequency
+            frequency = frequency ?: currentConfig.frequency,
+            startOffsetMs = startOffsetMs ?: currentConfig.startOffsetMs
         )
         layerConfigs[type]?.value = updatedConfig
         
         // Apply changes to audio engine
+        enabled?.let { audioEngine.setLayerEnabled(type, it) }
         volume?.let { audioEngine.setLayerVolume(type, it) }
         loop?.let { audioEngine.setLayerLoop(type, it) }
+        startOffsetMs?.let { audioEngine.setLayerStartOffset(type, it) }
         frequency?.let { 
             if (type == LayerType.TONE) {
                 audioEngine.updateToneFrequency(it)
@@ -75,12 +85,18 @@ class AudioRepositoryImpl @Inject constructor(
     
     override suspend fun previewAmbience(assetPath: String) {
         stopPreview()
-        
-        previewPlayer = ExoPlayer.Builder(context).build().apply {
-            val uri = "asset:///$assetPath"
-            setMediaItem(MediaItem.fromUri(uri))
-            prepare()
-            play()
+
+        val hasAsset = runCatching { context.assets.open(assetPath).close() }.isSuccess
+        if (hasAsset) {
+            previewPlayer = ExoPlayer.Builder(context).build().apply {
+                val uri = "asset:///$assetPath"
+                setMediaItem(MediaItem.fromUri(uri))
+                prepare()
+                play()
+            }
+        } else {
+            previewNoiseGenerator.setVolume(0.25f)
+            previewNoiseGenerator.start()
         }
     }
     
@@ -88,5 +104,16 @@ class AudioRepositoryImpl @Inject constructor(
         previewPlayer?.stop()
         previewPlayer?.release()
         previewPlayer = null
+        previewNoiseGenerator.stop()
+    }
+
+    override suspend fun previewTone(frequencyHz: Float, volume: Float) {
+        previewToneGenerator.setFrequency(frequencyHz)
+        previewToneGenerator.setVolume(volume)
+        previewToneGenerator.start()
+    }
+
+    override suspend fun stopTonePreview() {
+        previewToneGenerator.stop()
     }
 }

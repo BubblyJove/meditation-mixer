@@ -1,5 +1,8 @@
 package com.meditationmixer.core.ui.components
 
+import android.graphics.BlurMaskFilter
+import android.graphics.Paint as AndroidPaint
+import android.graphics.RectF
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -19,12 +22,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -78,14 +81,43 @@ fun NeumorphicSlider(
                 .clip(RoundedCornerShape(4.dp))
                 .background(Color.Black)
                 .drawBehind {
-                    // Inner shadow effect
-                    drawRoundRect(
-                        color = MeditationColors.textMuted.copy(alpha = 0.3f),
-                        topLeft = Offset(0f, -1.dp.toPx()),
-                        size = Size(size.width, size.height + 2.dp.toPx()),
-                        cornerRadius = CornerRadius(4.dp.toPx()),
-                        style = Stroke(width = 1.dp.toPx())
-                    )
+                    val blurPx = 3.dp.toPx().coerceAtLeast(1f)
+                    val offsetPx = blurPx / 2f
+                    val r = 4.dp.toPx()
+                    val rect = RectF(0f, 0f, size.width, size.height)
+
+                    val darkPaint = AndroidPaint().apply {
+                        isAntiAlias = true
+                        color = MeditationColors.neuShadowDark.copy(alpha = 0.55f).toArgb()
+                        maskFilter = BlurMaskFilter(blurPx, BlurMaskFilter.Blur.NORMAL)
+                    }
+                    val lightPaint = AndroidPaint().apply {
+                        isAntiAlias = true
+                        color = MeditationColors.neuShadowLight.copy(alpha = 0.25f).toArgb()
+                        maskFilter = BlurMaskFilter(blurPx, BlurMaskFilter.Blur.NORMAL)
+                    }
+
+                    drawIntoCanvas { canvas ->
+                        val nativeCanvas = canvas.nativeCanvas
+                        nativeCanvas.drawRoundRect(
+                            rect.left + offsetPx,
+                            rect.top + offsetPx,
+                            rect.right + offsetPx,
+                            rect.bottom + offsetPx,
+                            r,
+                            r,
+                            darkPaint
+                        )
+                        nativeCanvas.drawRoundRect(
+                            rect.left - offsetPx,
+                            rect.top - offsetPx,
+                            rect.right - offsetPx,
+                            rect.bottom - offsetPx,
+                            r,
+                            r,
+                            lightPaint
+                        )
+                    }
                 }
         )
         
@@ -106,6 +138,40 @@ fun NeumorphicSlider(
                     IntOffset(thumbOffset, 0)
                 }
                 .size(thumbSize)
+                .drawBehind {
+                    val blurPx = 6.dp.toPx().coerceAtLeast(1f)
+                    val offsetPx = blurPx / 2f
+                    val radius = (size.minDimension / 2f - blurPx).coerceAtLeast(0f)
+
+                    if (radius > 0f) {
+                        val darkPaint = AndroidPaint().apply {
+                            isAntiAlias = true
+                            color = Color.Black.copy(alpha = 0.35f).toArgb()
+                            maskFilter = BlurMaskFilter(blurPx, BlurMaskFilter.Blur.NORMAL)
+                        }
+                        val lightPaint = AndroidPaint().apply {
+                            isAntiAlias = true
+                            color = Color.White.copy(alpha = 0.18f).toArgb()
+                            maskFilter = BlurMaskFilter(blurPx, BlurMaskFilter.Blur.NORMAL)
+                        }
+
+                        drawIntoCanvas { canvas ->
+                            val nativeCanvas = canvas.nativeCanvas
+                            nativeCanvas.drawCircle(
+                                center.x + offsetPx,
+                                center.y + offsetPx,
+                                radius,
+                                darkPaint
+                            )
+                            nativeCanvas.drawCircle(
+                                center.x - offsetPx,
+                                center.y - offsetPx,
+                                radius,
+                                lightPaint
+                            )
+                        }
+                    }
+                }
                 .clip(CircleShape)
                 .background(
                     Brush.radialGradient(
@@ -120,19 +186,6 @@ fun NeumorphicSlider(
                         radius = thumbSizePx / 2
                     )
                 )
-                .drawBehind {
-                    // Thumb shadow and highlight
-                    drawCircle(
-                        color = Color.White.copy(alpha = 0.15f),
-                        radius = size.minDimension / 2 - 2.dp.toPx(),
-                        center = Offset(center.x, center.y - 1.dp.toPx())
-                    )
-                    drawCircle(
-                        color = Color.Black.copy(alpha = 0.3f),
-                        radius = size.minDimension / 2 - 2.dp.toPx(),
-                        center = Offset(center.x + 2.dp.toPx(), center.y + 2.dp.toPx())
-                    )
-                }
         )
     }
 }

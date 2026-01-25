@@ -1,5 +1,8 @@
 package com.mediationmixer.app.ui.mixer
 
+import android.content.Context
+import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,21 +28,34 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Loop
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Nature
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.meditationmixer.core.domain.model.LayerType
 import com.meditationmixer.core.ui.components.NeumorphicButton
@@ -53,6 +69,52 @@ fun MixerScreen(
     viewModel: MixerViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    val context = LocalContext.current
+
+    val audioPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri == null) {
+            viewModel.dismissFilePicker()
+        } else {
+            val name = queryDisplayName(context, uri)
+            viewModel.onUserAudioSelected(uri.toString(), name)
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.stopTonePreview()
+        }
+    }
+
+    LaunchedEffect(uiState.presetSaved, uiState.presetSaveError) {
+        when {
+            uiState.presetSaved -> {
+                snackbarHostState.showSnackbar("Preset saved")
+                viewModel.consumePresetSaveFeedback()
+            }
+            uiState.presetSaveError != null -> {
+                snackbarHostState.showSnackbar(uiState.presetSaveError!!)
+                viewModel.consumePresetSaveFeedback()
+            }
+        }
+    }
+
+    LaunchedEffect(uiState.tonePreviewError) {
+        uiState.tonePreviewError?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.consumeTonePreviewError()
+        }
+    }
+
+    LaunchedEffect(uiState.showFilePicker) {
+        if (uiState.showFilePicker) {
+            audioPickerLauncher.launch(arrayOf("audio/*"))
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -98,9 +160,41 @@ fun MixerScreen(
                     volume = uiState.toneVolume,
                     isLooping = true,
                     showLoop = false,
+                    isEnabled = uiState.toneEnabled,
+                    onEnabledToggle = viewModel::toggleToneEnabled,
                     onVolumeChange = viewModel::setToneVolume,
                     onLoopToggle = { },
                     extraContent = {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 8.dp),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            NeumorphicButton(
+                                onClick = viewModel::toggleTonePreview,
+                                isPressed = uiState.isTonePreviewing,
+                                modifier = Modifier.size(44.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            if (uiState.isTonePreviewing) MeditationColors.accentGradient
+                                            else MeditationColors.buttonGradient
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = if (uiState.isTonePreviewing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                        contentDescription = if (uiState.isTonePreviewing) "Stop preview" else "Preview tone",
+                                        tint = MeditationColors.textPrimary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
                         FrequencySlider(
                             frequency = uiState.toneFrequency,
                             onFrequencyChange = viewModel::setToneFrequency
@@ -116,9 +210,19 @@ fun MixerScreen(
                     volume = uiState.userAudioVolume,
                     isLooping = uiState.userAudioLoop,
                     showLoop = uiState.userAudioName != null,
+                    isEnabled = uiState.userAudioEnabled,
+                    onEnabledToggle = viewModel::toggleUserAudioEnabled,
                     onVolumeChange = viewModel::setUserAudioVolume,
                     onLoopToggle = viewModel::toggleUserAudioLoop,
-                    onCardClick = viewModel::importUserAudio
+                    onCardClick = viewModel::importUserAudio,
+                    extraContent = {
+                        if (uiState.userAudioName != null && uiState.userAudioLoop) {
+                            RepeatDelaySlider(
+                                delayMs = uiState.userAudioRepeatDelayMs,
+                                onDelayChangeMs = viewModel::setUserAudioRepeatDelayMs
+                            )
+                        }
+                    }
                 )
 
                 // Ambience Layer
@@ -129,6 +233,8 @@ fun MixerScreen(
                     volume = uiState.ambienceVolume,
                     isLooping = uiState.ambienceLoop,
                     showLoop = true,
+                    isEnabled = uiState.ambienceEnabled,
+                    onEnabledToggle = viewModel::toggleAmbienceEnabled,
                     onVolumeChange = viewModel::setAmbienceVolume,
                     onLoopToggle = viewModel::toggleAmbienceLoop,
                     onCardClick = viewModel::selectAmbience
@@ -142,7 +248,119 @@ fun MixerScreen(
                 onClick = viewModel::savePreset
             )
         }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(24.dp)
+        )
+
+        if (uiState.showAmbiencePicker) {
+            AmbiencePickerDialog(
+                currentId = uiState.ambienceAssetId,
+                onDismiss = viewModel::dismissAmbiencePicker,
+                onSelect = { id, name -> viewModel.onAmbienceSelected(id, name) }
+            )
+        }
     }
+}
+
+@Composable
+private fun RepeatDelaySlider(
+    delayMs: Long,
+    onDelayChangeMs: (Long) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val maxDelayMs = 10_000L
+    val normalized = (delayMs.toFloat() / maxDelayMs).coerceIn(0f, 1f)
+
+    Column(modifier = modifier.padding(top = 12.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "Repeat delay",
+                color = MeditationColors.textMuted,
+                fontSize = 12.sp
+            )
+            Text(
+                text = "${delayMs / 1000}s",
+                color = MeditationColors.accentPrimary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        NeumorphicSlider(
+            value = normalized,
+            onValueChange = { onDelayChangeMs((it * maxDelayMs).toLong()) },
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+@Composable
+private fun AmbiencePickerDialog(
+    currentId: String?,
+    onDismiss: () -> Unit,
+    onSelect: (String, String) -> Unit
+) {
+    val options = listOf(
+        "rain_light" to "Light Rain",
+        "rain_heavy" to "Heavy Rain",
+        "ocean_waves" to "Ocean Waves",
+        "forest_night" to "Forest Night",
+        "wind_soft" to "Soft Wind",
+        "river_stream" to "River Stream"
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = "Choose ambience", color = MeditationColors.textPrimary) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                options.forEach { (id, name) ->
+                    NeumorphicCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        isPressed = currentId == id,
+                        onClick = { onSelect(id, name) }
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = name,
+                                color = if (currentId == id) MeditationColors.textPrimary else MeditationColors.textSecondary,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = "Close", color = MeditationColors.accentPrimary)
+            }
+        }
+    )
+}
+
+private fun queryDisplayName(context: Context, uri: Uri): String {
+    val cursor = context.contentResolver.query(uri, null, null, null, null)
+    cursor?.use {
+        val nameIndex = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+        if (nameIndex >= 0 && it.moveToFirst()) {
+            return it.getString(nameIndex) ?: "Imported audio"
+        }
+    }
+    return "Imported audio"
 }
 
 @Composable
@@ -243,6 +461,8 @@ private fun LayerCard(
     volume: Float,
     isLooping: Boolean,
     showLoop: Boolean,
+    isEnabled: Boolean,
+    onEnabledToggle: () -> Unit,
     onVolumeChange: (Float) -> Unit,
     onLoopToggle: () -> Unit,
     onCardClick: (() -> Unit)? = null,
@@ -310,6 +530,28 @@ private fun LayerCard(
                             )
                         )
                     }
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PowerSettingsNew,
+                        contentDescription = "Enabled",
+                        tint = if (isEnabled) MeditationColors.accentPrimary else MeditationColors.textMuted,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Switch(
+                        checked = isEnabled,
+                        onCheckedChange = { onEnabledToggle() },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = MeditationColors.accentPrimary,
+                            checkedTrackColor = MeditationColors.accentDark,
+                            uncheckedThumbColor = MeditationColors.textMuted,
+                            uncheckedTrackColor = MeditationColors.surfaceDark
+                        )
+                    )
                 }
             }
 

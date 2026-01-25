@@ -23,22 +23,25 @@ fun MeditationMixerNavHost(
 ) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+    val showBottomBar = currentRoute != Screen.Mixer.route && currentRoute != Screen.Presets.route
 
     Scaffold(
         modifier = modifier,
         bottomBar = {
-            MeditationBottomBar(
-                currentRoute = currentRoute,
-                onNavigate = { route ->
-                    navController.navigate(route) {
-                        popUpTo(navController.graph.startDestinationId) {
-                            saveState = true
+            if (showBottomBar) {
+                MeditationBottomBar(
+                    currentRoute = currentRoute,
+                    onNavigate = { route ->
+                        navController.navigate(route) {
+                            popUpTo(navController.graph.startDestinationId) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
                         }
-                        launchSingleTop = true
-                        restoreState = true
                     }
-                }
-            )
+                )
+            }
         }
     ) { innerPadding ->
         NavHost(

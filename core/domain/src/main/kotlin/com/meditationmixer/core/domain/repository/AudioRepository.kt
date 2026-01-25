@@ -10,12 +10,17 @@ interface AudioRepository {
     suspend fun setMasterVolume(volume: Float)
     suspend fun updateLayer(
         type: LayerType,
+        enabled: Boolean? = null,
         volume: Float? = null,
         loop: Boolean? = null,
         sourceUri: String? = null,
         assetId: String? = null,
-        frequency: Float? = null
+        frequency: Float? = null,
+        startOffsetMs: Long? = null
     )
     suspend fun previewAmbience(assetPath: String)
     suspend fun stopPreview()
+
+    suspend fun previewTone(frequencyHz: Float, volume: Float)
+    suspend fun stopTonePreview()
 }

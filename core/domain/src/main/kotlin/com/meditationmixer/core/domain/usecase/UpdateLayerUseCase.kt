@@ -11,13 +11,24 @@ class UpdateLayerUseCase @Inject constructor(
 ) {
     suspend operator fun invoke(
         type: LayerType,
+        enabled: Boolean? = null,
         volume: Float? = null,
         loop: Boolean? = null,
         sourceUri: String? = null,
         assetId: String? = null,
-        frequency: Float? = null
+        frequency: Float? = null,
+        startOffsetMs: Long? = null
     ) {
-        audioRepository.updateLayer(type, volume, loop, sourceUri, assetId, frequency)
+        audioRepository.updateLayer(
+            type = type,
+            enabled = enabled,
+            volume = volume,
+            loop = loop,
+            sourceUri = sourceUri,
+            assetId = assetId,
+            frequency = frequency,
+            startOffsetMs = startOffsetMs
+        )
         
         // Check for importer achievement
         if (type == LayerType.USER_AUDIO && sourceUri != null) {

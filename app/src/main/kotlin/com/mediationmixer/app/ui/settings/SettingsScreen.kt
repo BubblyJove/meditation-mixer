@@ -1,5 +1,10 @@
 package com.mediationmixer.app.ui.settings
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,17 +21,20 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -34,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -47,6 +56,7 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
 
     Box(
         modifier = Modifier
@@ -138,7 +148,132 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
         }
+
+        if (uiState.showDonationDialog) {
+            SupportDevelopmentDialog(
+                context = context,
+                onDismiss = viewModel::dismissDonationDialog
+            )
+        }
     }
+}
+
+@Composable
+private fun SupportDevelopmentDialog(
+    context: Context,
+    onDismiss: () -> Unit
+) {
+    val paypalUrl = "https://paypal.me/GigaSneed"
+    val btc = "bc1qm3q4hd73yp9hvadd8enpp5eh74va95szalcvvv"
+    val eth = "0x2796E06947339E9d802Ed925D2aB57C1BDD7e0E0"
+    val sol = "HhoycRkJhTnvPMWXbzW2TMeFmqNcwsRTbvi88GmzB8Mm"
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = "Support Development", color = MeditationColors.textPrimary) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = "Thanks for supporting Meditation Mixer.",
+                    color = MeditationColors.textSecondary,
+                    fontSize = 14.sp
+                )
+
+                NeumorphicButton(
+                    onClick = { openUrl(context, paypalUrl) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MeditationColors.accentGradient)
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = "Open PayPal",
+                            color = MeditationColors.textPrimary,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+
+                CryptoCopyRow(label = "BTC", value = btc, context = context)
+                CryptoCopyRow(label = "ETH", value = eth, context = context)
+                CryptoCopyRow(label = "SOL", value = sol, context = context)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = "Close", color = MeditationColors.accentPrimary)
+            }
+        }
+    )
+}
+
+@Composable
+private fun CryptoCopyRow(
+    label: String,
+    value: String,
+    context: Context,
+    modifier: Modifier = Modifier
+) {
+    NeumorphicCard(modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = label,
+                    color = MeditationColors.textPrimary,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = value,
+                    color = MeditationColors.textMuted,
+                    fontSize = 11.sp
+                )
+            }
+
+            NeumorphicButton(
+                onClick = { copyToClipboard(context, label, value) },
+                modifier = Modifier.size(44.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ContentCopy,
+                        contentDescription = "Copy $label",
+                        tint = MeditationColors.textMuted,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun openUrl(context: Context, url: String) {
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    context.startActivity(intent)
+}
+
+private fun copyToClipboard(context: Context, label: String, value: String) {
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    clipboard.setPrimaryClip(ClipData.newPlainText(label, value))
 }
 
 @Composable

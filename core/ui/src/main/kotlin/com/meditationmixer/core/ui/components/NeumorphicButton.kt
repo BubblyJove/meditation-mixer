@@ -1,5 +1,8 @@
 package com.meditationmixer.core.ui.components
 
+import android.graphics.BlurMaskFilter
+import android.graphics.Paint as AndroidPaint
+import android.graphics.RectF
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -17,9 +20,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -46,7 +49,8 @@ fun NeumorphicButton(
             .neumorphicShadow(
                 isPressed = effectivePressed,
                 shadowRadius = shadowRadius,
-                shape = shape
+                isCircular = isCircular,
+                cornerRadius = cornerRadius
             )
             .clip(shape)
             .background(
@@ -68,35 +72,73 @@ fun NeumorphicButton(
 fun Modifier.neumorphicShadow(
     isPressed: Boolean,
     shadowRadius: Dp = 8.dp,
-    shape: Shape = CircleShape,
+    isCircular: Boolean = true,
+    cornerRadius: Dp = 16.dp,
     lightColor: Color = MeditationColors.neuShadowLight,
     darkColor: Color = MeditationColors.neuShadowDark
 ): Modifier = this.drawBehind {
     if (!isPressed) {
-        val shadowRadiusPx = shadowRadius.toPx()
-        val offsetPx = shadowRadiusPx / 2
-        
+        val blurPx = shadowRadius.toPx().coerceAtLeast(1f)
+        val offsetPx = blurPx / 2f
+
+        val darkPaint = AndroidPaint().apply {
+            isAntiAlias = true
+            color = darkColor.toArgb()
+            maskFilter = BlurMaskFilter(blurPx, BlurMaskFilter.Blur.NORMAL)
+        }
+        val lightPaint = AndroidPaint().apply {
+            isAntiAlias = true
+            color = lightColor.toArgb()
+            maskFilter = BlurMaskFilter(blurPx, BlurMaskFilter.Blur.NORMAL)
+        }
+
         drawIntoCanvas { canvas ->
-            val darkPaint = Paint().apply {
-                color = darkColor
+            val nativeCanvas = canvas.nativeCanvas
+
+            if (isCircular) {
+                val radius = size.minDimension / 2f
+
+                // Dark shadow (bottom-right)
+                nativeCanvas.drawCircle(
+                    center.x + offsetPx,
+                    center.y + offsetPx,
+                    radius,
+                    darkPaint
+                )
+
+                // Light shadow (top-left)
+                nativeCanvas.drawCircle(
+                    center.x - offsetPx,
+                    center.y - offsetPx,
+                    radius,
+                    lightPaint
+                )
+            } else {
+                val r = cornerRadius.toPx().coerceAtLeast(0f)
+                val rect = RectF(0f, 0f, size.width, size.height)
+
+                // Dark shadow (bottom-right)
+                nativeCanvas.drawRoundRect(
+                    rect.left + offsetPx,
+                    rect.top + offsetPx,
+                    rect.right + offsetPx,
+                    rect.bottom + offsetPx,
+                    r,
+                    r,
+                    darkPaint
+                )
+
+                // Light shadow (top-left)
+                nativeCanvas.drawRoundRect(
+                    rect.left - offsetPx,
+                    rect.top - offsetPx,
+                    rect.right - offsetPx,
+                    rect.bottom - offsetPx,
+                    r,
+                    r,
+                    lightPaint
+                )
             }
-            val lightPaint = Paint().apply {
-                color = lightColor
-            }
-            
-            // Dark shadow (bottom-right)
-            canvas.drawCircle(
-                center = Offset(center.x + offsetPx, center.y + offsetPx),
-                radius = size.minDimension / 2,
-                paint = darkPaint
-            )
-            
-            // Light shadow (top-left)
-            canvas.drawCircle(
-                center = Offset(center.x - offsetPx, center.y - offsetPx),
-                radius = size.minDimension / 2,
-                paint = lightPaint
-            )
         }
     }
 }

@@ -14,10 +14,10 @@ object MeditationColors {
     val neuDark = Color(0xFF090A0C)
     val neuLight = Color(0xFF3E434C)
     
-    // Accent colors (orange gradient)
-    val accentPrimary = Color(0xFFEA5610)
-    val accentSecondary = Color(0xFFD94D07)
-    val accentDark = Color(0xFFB43613)
+    // Accent colors (blue gradient)
+    val accentPrimary = Color(0xFF2F80ED)
+    val accentSecondary = Color(0xFF2D9CDB)
+    val accentDark = Color(0xFF1B5FBF)
     
     // Text colors
     val textPrimary = Color(0xFFFFFFFF)
@@ -25,8 +25,8 @@ object MeditationColors {
     val textMuted = Color(0xFF808080)
     
     // Slider track gradient colors
-    val sliderStart = Color(0xFFD93D07)
-    val sliderEnd = Color(0xFF937114)
+    val sliderStart = Color(0xFF2F80ED)
+    val sliderEnd = Color(0xFF56CCF2)
     
     // Gradients
     val backgroundGradient = Brush.verticalGradient(
@@ -65,8 +65,8 @@ object MeditationColors {
     
     val accentGradient = Brush.linearGradient(
         colors = listOf(
-            Color(0xFFDE3913),
-            Color(0xFFEA510E)
+            Color(0xFF2D9CDB),
+            Color(0xFF2F80ED)
         ),
         start = Offset(0f, 0f),
         end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
@@ -74,8 +74,8 @@ object MeditationColors {
     
     val accentWrapperGradient = Brush.linearGradient(
         colors = listOf(
-            Color(0xFFDA4D0C),
-            Color(0xFFB43613)
+            Color(0xFF2F80ED),
+            Color(0xFF1B5FBF)
         ),
         start = Offset(0f, 0f),
         end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)

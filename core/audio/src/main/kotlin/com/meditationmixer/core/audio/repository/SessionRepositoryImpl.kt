@@ -48,6 +48,9 @@ class SessionRepositoryImpl @Inject constructor(
     
     override suspend fun startSession(presetId: Long, durationMs: Long) {
         val preset = presetRepository.getPresetById(presetId).first() ?: return
+
+        timerJob?.cancel()
+        audioEngine.stop()
         
         audioEngine.loadPreset(preset)
         audioEngine.play()
