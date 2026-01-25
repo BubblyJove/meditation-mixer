@@ -2,6 +2,7 @@ package com.mediationmixer.app.ui.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.meditationmixer.core.common.Constants
 import com.meditationmixer.core.domain.usecase.GetSettingsUseCase
 import com.meditationmixer.core.domain.usecase.UpdateSettingsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -32,6 +33,7 @@ class SettingsViewModel @Inject constructor(
                     it.copy(
                         reminderEnabled = settings.reminderEnabled,
                         fadeDuration = settings.fadeDurationSeconds,
+                        defaultTimerMinutes = settings.defaultTimerMinutes,
                         version = "1.0.0"
                     )
                 }
@@ -54,6 +56,13 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun setDefaultTimer(minutes: Int) {
+        _uiState.update { it.copy(defaultTimerMinutes = minutes) }
+        viewModelScope.launch {
+            updateSettings.setDefaultTimer(minutes)
+        }
+    }
+
     fun onSupportClick() {
         // Open donation link - handled by the UI layer
         _uiState.update { it.copy(showDonationDialog = true) }
@@ -66,7 +75,8 @@ class SettingsViewModel @Inject constructor(
 
 data class SettingsUiState(
     val reminderEnabled: Boolean = false,
-    val fadeDuration: Int = 30,
+    val fadeDuration: Int = Constants.DEFAULT_FADE_SECONDS,
+    val defaultTimerMinutes: Int = Constants.DEFAULT_TIMER_MINUTES,
     val version: String = "",
     val showDonationDialog: Boolean = false
 )

@@ -44,11 +44,20 @@ class AudioEngineImpl @Inject constructor(
     private var ambienceEnabled = true
 
     private var userAudioLoop = true
+    private var ambienceLoop = true
     private var userAudioStartOffsetMs = 0L
     private var userAudioLoopRestartJob: Job? = null
 
     private val _isPlaying = MutableStateFlow(false)
     override val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
+
+    private val _currentPosition = MutableStateFlow(0L)
+    override val currentPosition: StateFlow<Long> = _currentPosition.asStateFlow()
+
+    private val _duration = MutableStateFlow(0L)
+    override val duration: StateFlow<Long> = _duration.asStateFlow()
+
+    private var positionUpdateJob: Job? = null
 
     private val userAudioLoopListener = object : Player.Listener {
         override fun onPlaybackStateChanged(playbackState: Int) {
@@ -69,15 +78,6 @@ class AudioEngineImpl @Inject constructor(
         }
     }
 
-    
-    private val _currentPosition = MutableStateFlow(0L)
-    override val currentPosition: StateFlow<Long> = _currentPosition.asStateFlow()
-    
-    private val _duration = MutableStateFlow(0L)
-    override val duration: StateFlow<Long> = _duration.asStateFlow()
-    
-    private var positionUpdateJob: Job? = null
-    
     override suspend fun loadPreset(preset: Preset) {
         release()
         
@@ -108,6 +108,7 @@ class AudioEngineImpl @Inject constructor(
                 }
                 LayerType.AMBIENCE -> {
                     ambienceEnabled = layer.enabled
+                    ambienceLoop = layer.loop
                     layer.assetId?.let { assetId ->
                         ambienceVolume = layer.volume
 
@@ -119,7 +120,7 @@ class AudioEngineImpl @Inject constructor(
                             val assetUri = "asset:///ambience/$assetId.ogg"
                             ambiencePlayer = createExoPlayer().apply {
                                 setMediaItem(MediaItem.fromUri(assetUri))
-                                repeatMode = if (layer.loop) Player.REPEAT_MODE_ALL else Player.REPEAT_MODE_OFF
+                                repeatMode = if (ambienceLoop) Player.REPEAT_MODE_ALL else Player.REPEAT_MODE_OFF
                                 volume = if (ambienceEnabled) ambienceVolume * masterVolume else 0f
                                 prepare()
                             }
@@ -128,6 +129,7 @@ class AudioEngineImpl @Inject constructor(
                             ambienceUsesNoise = true
                             ambiencePlayer?.release()
                             ambiencePlayer = null
+                            ambienceNoiseGenerator.setProfileFromAssetId(assetId)
                             ambienceNoiseGenerator.setVolume(if (ambienceEnabled) ambienceVolume * masterVolume else 0f)
                         }
                     }
@@ -149,12 +151,12 @@ class AudioEngineImpl @Inject constructor(
             Player.REPEAT_MODE_OFF
         }
     }
-    
+
     private fun createExoPlayer(): ExoPlayer {
         return ExoPlayer.Builder(context)
             .build()
     }
-    
+
     override suspend fun play() {
         if (toneEnabled) {
             toneGenerator.start()
@@ -175,7 +177,7 @@ class AudioEngineImpl @Inject constructor(
         _isPlaying.value = true
         startPositionUpdates()
     }
-    
+
     override suspend fun pause() {
         toneGenerator.pause()
         userAudioPlayer?.pause()
@@ -184,7 +186,7 @@ class AudioEngineImpl @Inject constructor(
         _isPlaying.value = false
         stopPositionUpdates()
     }
-    
+
     override suspend fun stop() {
         toneGenerator.stop()
         userAudioPlayer?.stop()
@@ -196,13 +198,13 @@ class AudioEngineImpl @Inject constructor(
         _currentPosition.value = 0
         stopPositionUpdates()
     }
-    
+
     override suspend fun seekTo(positionMs: Long) {
         userAudioPlayer?.seekTo(positionMs)
         ambiencePlayer?.seekTo(positionMs)
         _currentPosition.value = positionMs
     }
-    
+
     override suspend fun setMasterVolume(volume: Float) {
         masterVolume = volume.coerceIn(0f, 1f)
         toneGenerator.setVolume(if (toneEnabled) toneVolume * masterVolume else 0f)
@@ -213,7 +215,7 @@ class AudioEngineImpl @Inject constructor(
             ambiencePlayer?.volume = if (ambienceEnabled) ambienceVolume * masterVolume else 0f
         }
     }
-    
+
     override suspend fun setLayerVolume(type: LayerType, volume: Float) {
         val adjustedVolume = volume.coerceIn(0f, 1f)
         when (type) {
@@ -235,7 +237,7 @@ class AudioEngineImpl @Inject constructor(
             }
         }
     }
-    
+
     override suspend fun setLayerLoop(type: LayerType, loop: Boolean) {
         val repeatMode = if (loop) Player.REPEAT_MODE_ALL else Player.REPEAT_MODE_OFF
         when (type) {
@@ -244,7 +246,10 @@ class AudioEngineImpl @Inject constructor(
                 userAudioLoop = loop
                 applyUserAudioLooping()
             }
-            LayerType.AMBIENCE -> ambiencePlayer?.repeatMode = repeatMode
+            LayerType.AMBIENCE -> {
+                ambienceLoop = loop
+                ambiencePlayer?.repeatMode = repeatMode
+            }
         }
     }
 
@@ -288,16 +293,75 @@ class AudioEngineImpl @Inject constructor(
         userAudioStartOffsetMs = startOffsetMs.coerceAtLeast(0L)
         applyUserAudioLooping()
     }
-    
+
+    override suspend fun updateLayerSource(type: LayerType, sourceUri: String?, assetId: String?) {
+        when (type) {
+            LayerType.TONE -> Unit
+            LayerType.USER_AUDIO -> {
+                userAudioLoopRestartJob?.cancel()
+                userAudioLoopRestartJob = null
+
+                userAudioPlayer?.removeListener(userAudioLoopListener)
+                userAudioPlayer?.release()
+                userAudioPlayer = null
+
+                val uri = sourceUri ?: return
+                userAudioPlayer = createExoPlayer().apply {
+                    setMediaItem(MediaItem.fromUri(Uri.parse(uri)))
+                    repeatMode = Player.REPEAT_MODE_OFF
+                    volume = if (userAudioEnabled) userAudioVolume * masterVolume else 0f
+                    addListener(userAudioLoopListener)
+                    prepare()
+                }
+                applyUserAudioLooping()
+
+                if (_isPlaying.value && userAudioEnabled) {
+                    userAudioPlayer?.play()
+                }
+            }
+            LayerType.AMBIENCE -> {
+                ambiencePlayer?.release()
+                ambiencePlayer = null
+                ambienceNoiseGenerator.stop()
+                ambienceUsesNoise = false
+
+                val newAssetId = assetId ?: return
+                val assetPath = "ambience/$newAssetId.ogg"
+                val hasAsset = runCatching { context.assets.open(assetPath).close() }.isSuccess
+
+                if (hasAsset) {
+                    ambienceUsesNoise = false
+                    val assetUri = "asset:///ambience/$newAssetId.ogg"
+                    ambiencePlayer = createExoPlayer().apply {
+                        setMediaItem(MediaItem.fromUri(assetUri))
+                        repeatMode = if (ambienceLoop) Player.REPEAT_MODE_ALL else Player.REPEAT_MODE_OFF
+                        volume = if (ambienceEnabled) ambienceVolume * masterVolume else 0f
+                        prepare()
+                    }
+                    if (_isPlaying.value && ambienceEnabled) {
+                        ambiencePlayer?.play()
+                    }
+                } else {
+                    ambienceUsesNoise = true
+                    ambienceNoiseGenerator.setProfileFromAssetId(newAssetId)
+                    ambienceNoiseGenerator.setVolume(if (ambienceEnabled) ambienceVolume * masterVolume else 0f)
+                    if (_isPlaying.value && ambienceEnabled) {
+                        ambienceNoiseGenerator.start()
+                    }
+                }
+            }
+        }
+    }
+
     override suspend fun updateToneFrequency(frequencyHz: Float) {
         toneGenerator.setFrequency(frequencyHz)
     }
-    
+
     override suspend fun fadeOut(durationMs: Long) {
         val steps = 50
         val stepDelay = durationMs / steps
         val startMasterVolume = masterVolume
-        
+
         scope.launch {
             for (i in steps downTo 0) {
                 val newVolume = startMasterVolume * (i.toFloat() / steps)
@@ -307,7 +371,7 @@ class AudioEngineImpl @Inject constructor(
             stop()
         }
     }
-    
+
     private fun startPositionUpdates() {
         positionUpdateJob = scope.launch {
             while (_isPlaying.value) {
@@ -316,7 +380,7 @@ class AudioEngineImpl @Inject constructor(
             }
         }
     }
-    
+
     private fun stopPositionUpdates() {
         positionUpdateJob?.cancel()
         positionUpdateJob = null

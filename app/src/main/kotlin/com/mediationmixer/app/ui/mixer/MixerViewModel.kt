@@ -5,13 +5,15 @@ import androidx.lifecycle.viewModelScope
 import com.meditationmixer.core.domain.model.LayerConfig
 import com.meditationmixer.core.domain.model.LayerType
 import com.meditationmixer.core.domain.model.Preset
+import com.meditationmixer.core.domain.usecase.GetSettingsUseCase
 import com.meditationmixer.core.domain.usecase.PreviewToneUseCase
 import com.meditationmixer.core.domain.usecase.SavePresetUseCase
 import com.meditationmixer.core.domain.usecase.UpdateLayerUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -20,6 +22,7 @@ import javax.inject.Inject
 class MixerViewModel @Inject constructor(
     private val updateLayer: UpdateLayerUseCase,
     private val savePresetUseCase: SavePresetUseCase,
+    private val getSettings: GetSettingsUseCase,
     private val previewTone: PreviewToneUseCase
 ) : ViewModel() {
 
@@ -188,6 +191,10 @@ class MixerViewModel @Inject constructor(
 
     fun savePreset() {
         viewModelScope.launch {
+            val settings = getSettings().first()
+            val timerMs = settings.defaultTimerMinutes.toLong() * 60 * 1000L
+            val fadeOutMs = settings.fadeDurationSeconds.toLong() * 1000L
+
             val preset = Preset(
                 id = 0,
                 name = _uiState.value.presetName,
@@ -217,8 +224,8 @@ class MixerViewModel @Inject constructor(
                         loop = _uiState.value.ambienceLoop
                     )
                 ),
-                timerDurationMs = 30 * 60 * 1000L,
-                fadeOutDurationMs = 30 * 1000L
+                timerDurationMs = timerMs,
+                fadeOutDurationMs = fadeOutMs
             )
 
             runCatching {

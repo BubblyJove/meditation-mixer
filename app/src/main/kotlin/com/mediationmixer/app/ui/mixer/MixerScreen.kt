@@ -1,6 +1,7 @@
 package com.mediationmixer.app.ui.mixer
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.compose.foundation.background
@@ -42,7 +43,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -79,6 +79,12 @@ fun MixerScreen(
         if (uri == null) {
             viewModel.dismissFilePicker()
         } else {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }
             val name = queryDisplayName(context, uri)
             viewModel.onUserAudioSelected(uri.toString(), name)
         }
@@ -634,6 +640,7 @@ private fun SavePresetButton(
 ) {
     NeumorphicButton(
         onClick = onClick,
+        isCircular = false,
         modifier = modifier
             .fillMaxWidth()
             .height(56.dp)

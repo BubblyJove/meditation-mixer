@@ -3,11 +3,11 @@ package com.meditationmixer.core.common
 object Constants {
     // Session thresholds
     const val MIN_CREDIT_MINUTES = 10
-    const val DEFAULT_TIMER_MINUTES = 30
+    const val DEFAULT_TIMER_MINUTES = 60
     const val DEFAULT_FADE_SECONDS = 30
     
     // Timer presets in minutes
-    val TIMER_PRESETS = listOf(15, 30, 60, 90)
+    val TIMER_PRESETS = listOf(15, 30, 60, 90, 120, 180)
     
     // Frequency ranges (Hz)
     const val MIN_FREQUENCY = 1f

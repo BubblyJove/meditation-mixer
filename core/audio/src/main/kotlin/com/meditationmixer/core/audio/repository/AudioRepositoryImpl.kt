@@ -75,6 +75,9 @@ class AudioRepositoryImpl @Inject constructor(
         enabled?.let { audioEngine.setLayerEnabled(type, it) }
         volume?.let { audioEngine.setLayerVolume(type, it) }
         loop?.let { audioEngine.setLayerLoop(type, it) }
+        if (sourceUri != null || assetId != null) {
+            audioEngine.updateLayerSource(type = type, sourceUri = sourceUri, assetId = assetId)
+        }
         startOffsetMs?.let { audioEngine.setLayerStartOffset(type, it) }
         frequency?.let { 
             if (type == LayerType.TONE) {
@@ -95,6 +98,7 @@ class AudioRepositoryImpl @Inject constructor(
                 play()
             }
         } else {
+            previewNoiseGenerator.setProfileFromAssetId(assetPath)
             previewNoiseGenerator.setVolume(0.25f)
             previewNoiseGenerator.start()
         }

@@ -44,12 +44,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.meditationmixer.core.common.Constants
 import com.meditationmixer.core.ui.components.NeumorphicButton
 import com.meditationmixer.core.ui.components.NeumorphicCard
 import com.meditationmixer.core.ui.theme.MeditationColors
+import kotlin.math.roundToInt
 
 @Composable
 fun SettingsScreen(
@@ -95,6 +98,11 @@ fun SettingsScreen(
 
             // Timer settings
             SettingsSection(title = "Timer") {
+                val timerPresets = Constants.TIMER_PRESETS
+                val timerIndex = timerPresets.indexOf(uiState.defaultTimerMinutes)
+                    .takeIf { it >= 0 }
+                    ?: timerPresets.indexOf(Constants.DEFAULT_TIMER_MINUTES).coerceAtLeast(0)
+
                 SettingsSliderItem(
                     icon = Icons.Default.Timer,
                     title = "Default Fade Duration",
@@ -102,6 +110,20 @@ fun SettingsScreen(
                     value = uiState.fadeDuration.toFloat(),
                     range = 10f..60f,
                     onValueChange = { viewModel.setFadeDuration(it.toInt()) }
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                SettingsSliderItem(
+                    icon = Icons.Default.Timer,
+                    title = "Default Session Duration",
+                    subtitle = "${uiState.defaultTimerMinutes} minutes",
+                    value = timerIndex.toFloat(),
+                    range = 0f..timerPresets.lastIndex.toFloat(),
+                    onValueChange = {
+                        val idx = it.roundToInt().coerceIn(0, timerPresets.lastIndex)
+                        viewModel.setDefaultTimer(timerPresets[idx])
+                    }
                 )
             }
 
@@ -181,6 +203,7 @@ private fun SupportDevelopmentDialog(
 
                 NeumorphicButton(
                     onClick = { openUrl(context, paypalUrl) },
+                    isCircular = false,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -238,7 +261,9 @@ private fun CryptoCopyRow(
                 Text(
                     text = value,
                     color = MeditationColors.textMuted,
-                    fontSize = 11.sp
+                    fontSize = 11.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
 
@@ -409,6 +434,7 @@ private fun SettingsActionItem(
 ) {
     NeumorphicButton(
         onClick = onClick,
+        isCircular = false,
         modifier = modifier.fillMaxWidth()
     ) {
         Row(

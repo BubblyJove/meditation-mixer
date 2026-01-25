@@ -19,6 +19,7 @@ class ToneGenerator {
     
     private var audioTrack: AudioTrack? = null
     private var generatorJob: Job? = null
+    private var stopJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.Default)
     
     private val _isPlaying = MutableStateFlow(false)
@@ -26,6 +27,7 @@ class ToneGenerator {
     
     private var frequencyHz: Float = Constants.FrequencyPresets.THETA_6HZ
     private var volume: Float = 0.5f
+    private var carrierHz: Float = 220f
     
     private val sampleRate = Constants.SAMPLE_RATE
     private val bufferSize = Constants.AUDIO_BUFFER_SIZE
@@ -41,6 +43,13 @@ class ToneGenerator {
     
     fun start() {
         if (_isPlaying.value) return
+
+        stopJob?.cancel()
+        stopJob = null
+        generatorJob?.cancel()
+        generatorJob = null
+        audioTrack?.release()
+        audioTrack = null
         
         val minBufferSize = AudioTrack.getMinBufferSize(
             sampleRate,
@@ -77,19 +86,23 @@ class ToneGenerator {
     
     private suspend fun CoroutineScope.generateTone() {
         val samples = ShortArray(bufferSize / 2)
-        var phase = 0.0
+        var carrierPhase = 0.0
+        var modPhase = 0.0
         
         while (isActive && _isPlaying.value) {
-            val phaseIncrement = 2.0 * PI * frequencyHz / sampleRate
+            val carrierIncrement = 2.0 * PI * carrierHz / sampleRate
+            val modIncrement = 2.0 * PI * frequencyHz / sampleRate
             
             for (i in samples.indices) {
-                val sample = sin(phase) * Short.MAX_VALUE
+                val mod = ((sin(modPhase) + 1.0) * 0.5)
+                val sample = sin(carrierPhase) * mod * Short.MAX_VALUE
                 samples[i] = sample.toInt().toShort()
-                phase += phaseIncrement
-                
-                if (phase >= 2.0 * PI) {
-                    phase -= 2.0 * PI
-                }
+
+                carrierPhase += carrierIncrement
+                if (carrierPhase >= 2.0 * PI) carrierPhase -= 2.0 * PI
+
+                modPhase += modIncrement
+                if (modPhase >= 2.0 * PI) modPhase -= 2.0 * PI
             }
             
             audioTrack?.write(samples, 0, samples.size)
@@ -97,21 +110,49 @@ class ToneGenerator {
     }
     
     fun pause() {
-        _isPlaying.value = false
-        generatorJob?.cancel()
-        audioTrack?.pause()
+        fadeToStop(30L)
     }
     
     fun stop() {
+        fadeToStop(30L)
+    }
+
+    private fun fadeToStop(durationMs: Long) {
+        if (!_isPlaying.value && audioTrack == null) return
+
         _isPlaying.value = false
         generatorJob?.cancel()
-        audioTrack?.stop()
-        audioTrack?.release()
-        audioTrack = null
+        generatorJob = null
+
+        val track = audioTrack
+        if (track == null) return
+
+        stopJob?.cancel()
+        stopJob = scope.launch {
+            val steps = 12
+            val stepDelay = (durationMs / steps).coerceAtLeast(1L)
+            val startVolume = volume
+
+            for (i in steps downTo 0) {
+                val newVolume = startVolume * (i.toFloat() / steps)
+                track.setVolume(newVolume)
+                kotlinx.coroutines.delay(stepDelay)
+            }
+
+            runCatching { track.pause() }
+            runCatching { track.flush() }
+            runCatching { track.stop() }
+            runCatching { track.release() }
+
+            if (audioTrack === track) {
+                audioTrack = null
+            }
+        }
     }
     
     fun fadeOut(durationMs: Long, onComplete: () -> Unit) {
-        scope.launch {
+        stopJob?.cancel()
+        stopJob = scope.launch {
             val startVolume = volume
             val steps = 50
             val stepDelay = durationMs / steps
@@ -121,8 +162,15 @@ class ToneGenerator {
                 audioTrack?.setVolume(newVolume)
                 kotlinx.coroutines.delay(stepDelay)
             }
-            
-            stop()
+
+            _isPlaying.value = false
+            generatorJob?.cancel()
+            generatorJob = null
+            runCatching { audioTrack?.pause() }
+            runCatching { audioTrack?.flush() }
+            runCatching { audioTrack?.stop() }
+            runCatching { audioTrack?.release() }
+            audioTrack = null
             onComplete()
         }
     }
