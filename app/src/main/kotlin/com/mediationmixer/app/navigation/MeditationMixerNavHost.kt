@@ -13,6 +13,7 @@ import androidx.navigation.compose.rememberNavController
 import com.mediationmixer.app.ui.home.HomeScreen
 import com.mediationmixer.app.ui.library.LibraryScreen
 import com.mediationmixer.app.ui.mixer.MixerScreen
+import com.mediationmixer.app.ui.presets.PresetsScreen
 import com.mediationmixer.app.ui.settings.SettingsScreen
 import com.mediationmixer.app.ui.streaks.StreaksScreen
 
@@ -51,7 +52,12 @@ fun MeditationMixerNavHost(
         ) {
             composable(Screen.Home.route) {
                 HomeScreen(
-                    onNavigateToMixer = { navController.navigate(Screen.Mixer.route) }
+                    onNavigateToMixer = { navController.navigate(Screen.Presets.route) }
+                )
+            }
+            composable(Screen.Presets.route) {
+                PresetsScreen(
+                    onNavigateBack = { navController.popBackStack() }
                 )
             }
             composable(Screen.Mixer.route) {
@@ -74,6 +80,7 @@ fun MeditationMixerNavHost(
 
 sealed class Screen(val route: String) {
     data object Home : Screen("home")
+    data object Presets : Screen("presets")
     data object Mixer : Screen("mixer")
     data object Library : Screen("library")
     data object Streaks : Screen("streaks")
