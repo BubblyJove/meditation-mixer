@@ -4,6 +4,12 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -41,9 +47,9 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -63,6 +69,8 @@ import com.meditationmixer.core.ui.components.NeumorphicButton
 import com.meditationmixer.core.ui.components.NeumorphicCard
 import com.meditationmixer.core.ui.components.NeumorphicSlider
 import com.meditationmixer.core.ui.theme.MeditationColors
+import kotlin.math.PI
+import kotlin.math.sin
 
 @Composable
 fun MixerScreen(
@@ -145,6 +153,12 @@ fun MixerScreen(
 
             // Visual preview
             MixerVisual(
+                toneEnabled = uiState.toneEnabled,
+                toneVolume = uiState.toneVolume,
+                userAudioEnabled = uiState.userAudioEnabled,
+                userAudioVolume = uiState.userAudioVolume,
+                ambienceEnabled = uiState.ambienceEnabled,
+                ambienceVolume = uiState.ambienceVolume,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(120.dp)
@@ -168,6 +182,7 @@ fun MixerScreen(
                     isLooping = true,
                     showLoop = false,
                     isEnabled = uiState.toneEnabled,
+                    activityLevel = if (uiState.toneEnabled) uiState.toneVolume else 0f,
                     onEnabledToggle = viewModel::toggleToneEnabled,
                     onVolumeChange = viewModel::setToneVolume,
                     onLoopToggle = { },
@@ -218,6 +233,7 @@ fun MixerScreen(
                     isLooping = uiState.userAudioLoop,
                     showLoop = uiState.userAudioName != null,
                     isEnabled = uiState.userAudioEnabled,
+                    activityLevel = if (uiState.userAudioEnabled) uiState.userAudioVolume else 0f,
                     onEnabledToggle = viewModel::toggleUserAudioEnabled,
                     onVolumeChange = viewModel::setUserAudioVolume,
                     onLoopToggle = viewModel::toggleUserAudioLoop,
@@ -241,6 +257,7 @@ fun MixerScreen(
                     isLooping = uiState.ambienceLoop,
                     showLoop = true,
                     isEnabled = uiState.ambienceEnabled,
+                    activityLevel = if (uiState.ambienceEnabled) uiState.ambienceVolume else 0f,
                     onEnabledToggle = viewModel::toggleAmbienceEnabled,
                     onVolumeChange = viewModel::setAmbienceVolume,
                     onLoopToggle = viewModel::toggleAmbienceLoop,
@@ -274,168 +291,32 @@ fun MixerScreen(
 }
 
 @Composable
-private fun RepeatDelaySlider(
-    delayMs: Long,
-    onDelayChangeMs: (Long) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val maxDelayMs = 10_000L
-    val normalized = (delayMs.toFloat() / maxDelayMs).coerceIn(0f, 1f)
-
-    Column(modifier = modifier.padding(top = 12.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = "Repeat delay",
-                color = MeditationColors.textMuted,
-                fontSize = 12.sp
-            )
-            Text(
-                text = "${delayMs / 1000}s",
-                color = MeditationColors.accentPrimary,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium
-            )
-        }
-        Spacer(modifier = Modifier.height(4.dp))
-        NeumorphicSlider(
-            value = normalized,
-            onValueChange = { onDelayChangeMs((it * maxDelayMs).toLong()) },
-            modifier = Modifier.fillMaxWidth()
-        )
-    }
-}
-
-@Composable
-private fun AmbiencePickerDialog(
-    currentId: String?,
-    onDismiss: () -> Unit,
-    onSelect: (String, String) -> Unit
-) {
-    val options = listOf(
-        "rain_light" to "Light Rain",
-        "rain_heavy" to "Heavy Rain",
-        "ocean_waves" to "Ocean Waves",
-        "forest_night" to "Forest Night",
-        "wind_soft" to "Soft Wind",
-        "river_stream" to "River Stream"
-    )
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(text = "Choose ambience", color = MeditationColors.textPrimary) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                options.forEach { (id, name) ->
-                    NeumorphicCard(
-                        modifier = Modifier.fillMaxWidth(),
-                        isPressed = currentId == id,
-                        onClick = { onSelect(id, name) }
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = name,
-                                color = if (currentId == id) MeditationColors.textPrimary else MeditationColors.textSecondary,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(text = "Close", color = MeditationColors.accentPrimary)
-            }
-        }
-    )
-}
-
-private fun queryDisplayName(context: Context, uri: Uri): String {
-    val cursor = context.contentResolver.query(uri, null, null, null, null)
-    cursor?.use {
-        val nameIndex = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-        if (nameIndex >= 0 && it.moveToFirst()) {
-            return it.getString(nameIndex) ?: "Imported audio"
-        }
-    }
-    return "Imported audio"
-}
-
-@Composable
-private fun MixerHeader(
-    presetName: String,
-    isFavorite: Boolean,
-    onBackClick: () -> Unit,
-    onFavoriteClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        NeumorphicButton(
-            onClick = onBackClick,
-            modifier = Modifier.size(48.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ArrowBack,
-                    contentDescription = "Back",
-                    tint = MeditationColors.textMuted,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-        }
-
-        Text(
-            text = presetName.uppercase(),
-            color = MeditationColors.textMuted,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium,
-            letterSpacing = 2.sp
-        )
-
-        NeumorphicButton(
-            onClick = onFavoriteClick,
-            isPressed = isFavorite,
-            modifier = Modifier.size(48.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                    contentDescription = "Favorite",
-                    tint = if (isFavorite) MeditationColors.accentPrimary else MeditationColors.textMuted,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun MixerVisual(
+    toneEnabled: Boolean,
+    toneVolume: Float,
+    userAudioEnabled: Boolean,
+    userAudioVolume: Float,
+    ambienceEnabled: Boolean,
+    ambienceVolume: Float,
     modifier: Modifier = Modifier
 ) {
+    val transition = rememberInfiniteTransition(label = "mixerVisual")
+    val phase by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = (2f * PI).toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "phase"
+    )
+
+    val activity = listOf(
+        if (toneEnabled) toneVolume.coerceIn(0f, 1f) else 0f,
+        if (userAudioEnabled) userAudioVolume.coerceIn(0f, 1f) else 0f,
+        if (ambienceEnabled) ambienceVolume.coerceIn(0f, 1f) else 0f
+    )
+
     NeumorphicCard(
         modifier = modifier
     ) {
@@ -448,13 +329,59 @@ private fun MixerVisual(
         ) {
             // Placeholder for audio visualization
             repeat(12) {
+                val group = (it / 4).coerceIn(0, activity.lastIndex)
+                val local = it % 4
+                val a = activity[group]
+                val wave = (sin(phase + it * 0.65f + local * 0.35f) + 1f) / 2f
+                val heightDp = 10f + (60f * (0.35f + 0.65f * wave) * a)
+
                 Box(
                     modifier = Modifier
                         .width(8.dp)
-                        .height((20 + (Math.random() * 60).toInt()).dp)
+                        .height(heightDp.dp)
                         .clip(RoundedCornerShape(4.dp))
                         .background(MeditationColors.accentGradient)
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MiniWaveIndicator(
+    activityLevel: Float,
+    modifier: Modifier = Modifier
+) {
+    val transition = rememberInfiniteTransition(label = "miniWave")
+    val phase by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = (2f * PI).toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 900, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "phase"
+    )
+
+    val a = activityLevel.coerceIn(0f, 1f)
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        repeat(3) { i ->
+            val wave = (sin(phase + i * 1.1f) + 1f) / 2f
+            val h = 6f + (10f * wave * a)
+            Box(
+                modifier = Modifier
+                    .width(3.dp)
+                    .height(h.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(
+                        MeditationColors.accentPrimary.copy(alpha = 0.35f + 0.65f * a)
+                    )
+            )
+            if (i < 2) {
+                Spacer(modifier = Modifier.width(2.dp))
             }
         }
     }
@@ -469,6 +396,7 @@ private fun LayerCard(
     isLooping: Boolean,
     showLoop: Boolean,
     isEnabled: Boolean,
+    activityLevel: Float,
     onEnabledToggle: () -> Unit,
     onVolumeChange: (Float) -> Unit,
     onLoopToggle: () -> Unit,
@@ -499,6 +427,8 @@ private fun LayerCard(
                         tint = MeditationColors.accentPrimary,
                         modifier = Modifier.size(24.dp)
                     )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    MiniWaveIndicator(activityLevel = activityLevel)
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
