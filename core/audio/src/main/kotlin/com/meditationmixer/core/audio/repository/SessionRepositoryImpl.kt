@@ -147,7 +147,6 @@ class SessionRepositoryImpl @Inject constructor(
         _currentSession.value = session.copy(state = SessionState.PLAYING)
         
         // Resume timer from current position
-        val remainingMs = session.remainingMs
         val resumeTime = System.currentTimeMillis() - session.elapsedMs
         startTimer(session.timerDurationMs, resumeTime)
     }
