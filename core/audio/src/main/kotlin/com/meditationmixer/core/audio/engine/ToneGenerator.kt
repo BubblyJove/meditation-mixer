@@ -75,7 +75,7 @@ class ToneGenerator {
         }
     }
     
-    private suspend fun generateTone() {
+    private suspend fun CoroutineScope.generateTone() {
         val samples = ShortArray(bufferSize / 2)
         var phase = 0.0
         
