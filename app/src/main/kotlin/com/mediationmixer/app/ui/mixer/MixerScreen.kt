@@ -291,6 +291,165 @@ fun MixerScreen(
 }
 
 @Composable
+private fun RepeatDelaySlider(
+    delayMs: Long,
+    onDelayChangeMs: (Long) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val maxDelayMs = 10_000L
+    val normalized = (delayMs.toFloat() / maxDelayMs).coerceIn(0f, 1f)
+
+    Column(modifier = modifier.padding(top = 12.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "Repeat delay",
+                color = MeditationColors.textMuted,
+                fontSize = 12.sp
+            )
+            Text(
+                text = "${delayMs / 1000}s",
+                color = MeditationColors.accentPrimary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        NeumorphicSlider(
+            value = normalized,
+            onValueChange = { onDelayChangeMs((it * maxDelayMs).toLong()) },
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+@Composable
+private fun AmbiencePickerDialog(
+    currentId: String?,
+    onDismiss: () -> Unit,
+    onSelect: (String, String) -> Unit
+) {
+    val options = listOf(
+        "rain_light" to "Light Rain",
+        "rain_heavy" to "Heavy Rain",
+        "ocean_waves" to "Ocean Waves",
+        "forest_night" to "Forest Night",
+        "wind_soft" to "Soft Wind",
+        "river_stream" to "River Stream"
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = "Choose ambience", color = MeditationColors.textPrimary) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                options.forEach { (id, name) ->
+                    NeumorphicCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        isPressed = currentId == id,
+                        onClick = { onSelect(id, name) }
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = name,
+                                color = if (currentId == id) MeditationColors.textPrimary else MeditationColors.textSecondary,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = "Close", color = MeditationColors.accentPrimary)
+            }
+        }
+    )
+}
+
+private fun queryDisplayName(context: Context, uri: Uri): String {
+    val cursor = context.contentResolver.query(uri, null, null, null, null)
+    cursor?.use {
+        val nameIndex = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+        if (nameIndex >= 0 && it.moveToFirst()) {
+            return it.getString(nameIndex) ?: "Imported audio"
+        }
+    }
+    return "Imported audio"
+}
+
+@Composable
+private fun MixerHeader(
+    presetName: String,
+    isFavorite: Boolean,
+    onBackClick: () -> Unit,
+    onFavoriteClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        NeumorphicButton(
+            onClick = onBackClick,
+            modifier = Modifier.size(48.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ArrowBack,
+                    contentDescription = "Back",
+                    tint = MeditationColors.textMuted,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+
+        Text(
+            text = presetName.uppercase(),
+            color = MeditationColors.textMuted,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+            letterSpacing = 2.sp
+        )
+
+        NeumorphicButton(
+            onClick = onFavoriteClick,
+            isPressed = isFavorite,
+            modifier = Modifier.size(48.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    contentDescription = "Favorite",
+                    tint = if (isFavorite) MeditationColors.accentPrimary else MeditationColors.textMuted,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun MixerVisual(
     toneEnabled: Boolean,
     toneVolume: Float,
