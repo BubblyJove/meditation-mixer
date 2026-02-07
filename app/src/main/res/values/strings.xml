@@ -79,6 +79,10 @@
     <string name="notification_channel_playback">Playback</string>
     <string name="notification_channel_playback_desc">Audio playback controls</string>
     <string name="notification_playing">Playing meditation session</string>
+    <string name="notification_channel_reminder">Reminders</string>
+    <string name="notification_channel_reminder_desc">Daily meditation reminders</string>
+    <string name="reminder_notification_title">Time to Meditate</string>
+    <string name="reminder_notification_text">Take a moment to relax and unwind with a meditation session.</string>
     
     <!-- Errors -->
     <string name="error_audio_load">Could not load audio file</string>

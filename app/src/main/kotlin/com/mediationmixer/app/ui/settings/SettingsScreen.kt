@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -38,6 +39,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -92,6 +95,17 @@ fun SettingsScreen(
                     isEnabled = uiState.reminderEnabled,
                     onToggle = viewModel::toggleReminder
                 )
+
+                if (uiState.reminderEnabled) {
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    SettingsActionItem(
+                        icon = Icons.Default.Schedule,
+                        title = "Reminder Time",
+                        subtitle = String.format("%02d:%02d", uiState.reminderHour, uiState.reminderMinute),
+                        onClick = viewModel::showTimePicker
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -177,7 +191,94 @@ fun SettingsScreen(
                 onDismiss = viewModel::dismissDonationDialog
             )
         }
+
+        if (uiState.showTimePicker) {
+            ReminderTimePickerDialog(
+                initialHour = uiState.reminderHour,
+                initialMinute = uiState.reminderMinute,
+                onConfirm = viewModel::setReminderTime,
+                onDismiss = viewModel::dismissTimePicker
+            )
+        }
     }
+}
+
+@Composable
+private fun ReminderTimePickerDialog(
+    initialHour: Int,
+    initialMinute: Int,
+    onConfirm: (Int, Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val hour = remember { mutableIntStateOf(initialHour) }
+    val minute = remember { mutableIntStateOf(initialMinute) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = "Set Reminder Time", color = MeditationColors.textPrimary) },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = String.format("%02d:%02d", hour.intValue, minute.intValue),
+                    color = MeditationColors.accentPrimary,
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                )
+
+                Column {
+                    Text(
+                        text = "Hour",
+                        color = MeditationColors.textMuted,
+                        fontSize = 12.sp
+                    )
+                    Slider(
+                        value = hour.intValue.toFloat(),
+                        onValueChange = { hour.intValue = it.roundToInt() },
+                        valueRange = 0f..23f,
+                        steps = 22,
+                        colors = SliderDefaults.colors(
+                            thumbColor = MeditationColors.accentPrimary,
+                            activeTrackColor = MeditationColors.accentPrimary,
+                            inactiveTrackColor = MeditationColors.surfaceDark
+                        )
+                    )
+                }
+
+                Column {
+                    Text(
+                        text = "Minute",
+                        color = MeditationColors.textMuted,
+                        fontSize = 12.sp
+                    )
+                    Slider(
+                        value = minute.intValue.toFloat(),
+                        onValueChange = { minute.intValue = (it.roundToInt() / 5) * 5 },
+                        valueRange = 0f..55f,
+                        steps = 10,
+                        colors = SliderDefaults.colors(
+                            thumbColor = MeditationColors.accentPrimary,
+                            activeTrackColor = MeditationColors.accentPrimary,
+                            inactiveTrackColor = MeditationColors.surfaceDark
+                        )
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(hour.intValue, minute.intValue) }) {
+                Text(text = "Set", color = MeditationColors.accentPrimary)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = "Cancel", color = MeditationColors.textMuted)
+            }
+        }
+    )
 }
 
 @Composable

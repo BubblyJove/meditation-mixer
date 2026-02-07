@@ -248,23 +248,30 @@ private fun MainVisual(
         }
 
         NeumorphicCard(
-            modifier = Modifier.size(280.dp),
+            modifier = Modifier.size(268.dp),
             isCircular = true
         ) {
             Box(
                 modifier = Modifier
-                    .size(260.dp)
+                    .size(264.dp)
                     .clip(CircleShape)
                     .background(MeditationColors.surfaceGradient),
                 contentAlignment = Alignment.Center
             ) {
-                // Meditation visual - could be animated waves or a calm visual
                 Box(
                     modifier = Modifier
-                        .size(240.dp)
+                        .size(220.dp)
                         .clip(CircleShape)
-                        .background(MeditationColors.accentGradient)
-                )
+                        .background(MeditationColors.accentGradient),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        tint = MeditationColors.textPrimary.copy(alpha = 0.3f),
+                        modifier = Modifier.size(64.dp)
+                    )
+                }
             }
         }
     }

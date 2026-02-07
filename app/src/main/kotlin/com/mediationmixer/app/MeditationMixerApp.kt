@@ -25,12 +25,22 @@ class MeditationMixerApp : Application() {
                 setShowBadge(false)
             }
 
+            val reminderChannel = NotificationChannel(
+                CHANNEL_REMINDER,
+                getString(R.string.notification_channel_reminder),
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = getString(R.string.notification_channel_reminder_desc)
+            }
+
             val notificationManager = getSystemService(NotificationManager::class.java)
             notificationManager.createNotificationChannel(playbackChannel)
+            notificationManager.createNotificationChannel(reminderChannel)
         }
     }
 
     companion object {
         const val CHANNEL_PLAYBACK = "playback_channel"
+        const val CHANNEL_REMINDER = "reminder_channel"
     }
 }

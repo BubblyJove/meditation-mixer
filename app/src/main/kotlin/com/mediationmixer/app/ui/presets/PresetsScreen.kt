@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.meditationmixer.core.domain.model.Preset
+import com.meditationmixer.core.domain.model.SessionState
 import com.meditationmixer.core.ui.components.NeumorphicButton
 import com.meditationmixer.core.ui.components.NeumorphicCard
 import com.meditationmixer.core.ui.theme.MeditationColors
@@ -94,10 +95,11 @@ fun PresetsScreen(
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(uiState.presets) { preset ->
+                items(uiState.presets, key = { it.id }) { preset ->
+                    val isThisPreset = uiState.playingPresetId == preset.id
                     PresetRow(
                         preset = preset,
-                        isPlaying = uiState.playingPresetId == preset.id,
+                        isPlaying = isThisPreset && uiState.sessionState == SessionState.PLAYING,
                         onPlay = { viewModel.playPreset(preset) },
                         onToggleFavorite = { viewModel.toggleFavorite(preset) }
                     )

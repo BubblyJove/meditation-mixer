@@ -79,6 +79,7 @@ dependencies {
     implementation(libs.hilt.navigation.compose)
 
     implementation(libs.bundles.media3)
+    implementation(libs.work.runtime.ktx)
 
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)

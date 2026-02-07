@@ -17,7 +17,8 @@ class Converters {
                 layer.volume.toString(),
                 layer.loop.toString(),
                 layer.frequency?.toString() ?: "",
-                layer.startOffsetMs.toString()
+                layer.startOffsetMs.toString(),
+                layer.binaural.toString()
             ).joinToString(FIELD_SEPARATOR)
         }
     }
@@ -45,6 +46,7 @@ class Converters {
             val loop = fields.getOrNull(if (hasEnabled) 5 else 4)?.toBoolean() ?: true
             val frequency = fields.getOrNull(if (hasEnabled) 6 else 5)?.takeIf { it.isNotEmpty() }?.toFloatOrNull()
             val startOffsetMs = fields.getOrNull(if (hasEnabled) 7 else 6)?.toLongOrNull() ?: 0L
+            val binaural = fields.getOrNull(if (hasEnabled) 8 else 7)?.toBoolean() ?: false
 
             LayerConfig(
                 type = type,
@@ -54,7 +56,8 @@ class Converters {
                 volume = volume,
                 loop = loop,
                 frequency = frequency,
-                startOffsetMs = startOffsetMs
+                startOffsetMs = startOffsetMs,
+                binaural = binaural
             )
         }
     }

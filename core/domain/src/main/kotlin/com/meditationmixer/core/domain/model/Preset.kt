@@ -19,7 +19,8 @@ data class LayerConfig(
     val volume: Float = 0.5f,
     val loop: Boolean = true,
     val frequency: Float? = null,
-    val startOffsetMs: Long = 0
+    val startOffsetMs: Long = 0,
+    val binaural: Boolean = false
 )
 
 enum class LayerType {

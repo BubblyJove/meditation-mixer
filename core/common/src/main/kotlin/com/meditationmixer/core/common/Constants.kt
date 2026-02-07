@@ -11,7 +11,7 @@ object Constants {
     
     // Frequency ranges (Hz)
     const val MIN_FREQUENCY = 1f
-    const val MAX_FREQUENCY = 40f
+    const val MAX_FREQUENCY = 1000f
     
     // Frequency presets
     object FrequencyPresets {

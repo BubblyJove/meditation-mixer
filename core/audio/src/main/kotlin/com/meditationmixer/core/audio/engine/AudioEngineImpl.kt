@@ -86,6 +86,7 @@ class AudioEngineImpl @Inject constructor(
                 LayerType.TONE -> {
                     toneEnabled = layer.enabled
                     layer.frequency?.let { toneGenerator.setFrequency(it) }
+                    toneGenerator.setBinaural(layer.binaural)
                     toneVolume = layer.volume
                     toneGenerator.setVolume(if (toneEnabled) toneVolume * masterVolume else 0f)
                 }
@@ -355,6 +356,10 @@ class AudioEngineImpl @Inject constructor(
 
     override suspend fun updateToneFrequency(frequencyHz: Float) {
         toneGenerator.setFrequency(frequencyHz)
+    }
+
+    override suspend fun setToneBinaural(enabled: Boolean) {
+        toneGenerator.setBinaural(enabled)
     }
 
     override suspend fun fadeOut(durationMs: Long) {

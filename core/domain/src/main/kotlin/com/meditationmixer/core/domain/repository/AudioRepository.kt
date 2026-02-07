@@ -16,7 +16,8 @@ interface AudioRepository {
         sourceUri: String? = null,
         assetId: String? = null,
         frequency: Float? = null,
-        startOffsetMs: Long? = null
+        startOffsetMs: Long? = null,
+        binaural: Boolean? = null
     )
     suspend fun previewAmbience(assetPath: String)
     suspend fun stopPreview()

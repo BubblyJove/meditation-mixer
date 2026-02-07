@@ -57,7 +57,8 @@ class AudioRepositoryImpl @Inject constructor(
         sourceUri: String?,
         assetId: String?,
         frequency: Float?,
-        startOffsetMs: Long?
+        startOffsetMs: Long?,
+        binaural: Boolean?
     ) {
         val currentConfig = layerConfigs[type]?.value ?: LayerConfig(type = type)
         val updatedConfig = currentConfig.copy(
@@ -67,10 +68,11 @@ class AudioRepositoryImpl @Inject constructor(
             sourceUri = sourceUri ?: currentConfig.sourceUri,
             assetId = assetId ?: currentConfig.assetId,
             frequency = frequency ?: currentConfig.frequency,
-            startOffsetMs = startOffsetMs ?: currentConfig.startOffsetMs
+            startOffsetMs = startOffsetMs ?: currentConfig.startOffsetMs,
+            binaural = binaural ?: currentConfig.binaural
         )
         layerConfigs[type]?.value = updatedConfig
-        
+
         // Apply changes to audio engine
         enabled?.let { audioEngine.setLayerEnabled(type, it) }
         volume?.let { audioEngine.setLayerVolume(type, it) }
@@ -79,15 +81,26 @@ class AudioRepositoryImpl @Inject constructor(
             audioEngine.updateLayerSource(type = type, sourceUri = sourceUri, assetId = assetId)
         }
         startOffsetMs?.let { audioEngine.setLayerStartOffset(type, it) }
-        frequency?.let { 
+        frequency?.let {
             if (type == LayerType.TONE) {
                 audioEngine.updateToneFrequency(it)
+            }
+        }
+        binaural?.let {
+            if (type == LayerType.TONE) {
+                audioEngine.setToneBinaural(it)
             }
         }
     }
     
     override suspend fun previewAmbience(assetPath: String) {
         stopPreview()
+
+        // Extract asset ID from path (e.g., "ambience/rain_light.ogg" -> "rain_light")
+        val assetId = assetPath
+            .substringAfterLast("/")
+            .substringBeforeLast(".")
+            .ifEmpty { assetPath }
 
         val hasAsset = runCatching { context.assets.open(assetPath).close() }.isSuccess
         if (hasAsset) {
@@ -98,7 +111,7 @@ class AudioRepositoryImpl @Inject constructor(
                 play()
             }
         } else {
-            previewNoiseGenerator.setProfileFromAssetId(assetPath)
+            previewNoiseGenerator.setProfileFromAssetId(assetId)
             previewNoiseGenerator.setVolume(0.25f)
             previewNoiseGenerator.start()
         }

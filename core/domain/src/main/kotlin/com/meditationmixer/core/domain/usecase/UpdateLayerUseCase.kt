@@ -17,7 +17,8 @@ class UpdateLayerUseCase @Inject constructor(
         sourceUri: String? = null,
         assetId: String? = null,
         frequency: Float? = null,
-        startOffsetMs: Long? = null
+        startOffsetMs: Long? = null,
+        binaural: Boolean? = null
     ) {
         audioRepository.updateLayer(
             type = type,
@@ -27,7 +28,8 @@ class UpdateLayerUseCase @Inject constructor(
             sourceUri = sourceUri,
             assetId = assetId,
             frequency = frequency,
-            startOffsetMs = startOffsetMs
+            startOffsetMs = startOffsetMs,
+            binaural = binaural
         )
         
         // Check for importer achievement

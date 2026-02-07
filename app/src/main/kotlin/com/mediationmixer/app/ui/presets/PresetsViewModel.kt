@@ -3,8 +3,10 @@ package com.mediationmixer.app.ui.presets
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.meditationmixer.core.domain.model.Preset
+import com.meditationmixer.core.domain.model.SessionState
 import com.meditationmixer.core.domain.usecase.GetCurrentSessionUseCase
 import com.meditationmixer.core.domain.usecase.GetPresetsUseCase
+import com.meditationmixer.core.domain.usecase.PlayPauseSessionUseCase
 import com.meditationmixer.core.domain.usecase.SetFavoritePresetUseCase
 import com.meditationmixer.core.domain.usecase.StartSessionUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -19,6 +21,7 @@ import javax.inject.Inject
 class PresetsViewModel @Inject constructor(
     private val getPresets: GetPresetsUseCase,
     private val getCurrentSession: GetCurrentSessionUseCase,
+    private val playPauseSession: PlayPauseSessionUseCase,
     private val startSession: StartSessionUseCase,
     private val setFavoritePreset: SetFavoritePresetUseCase
 ) : ViewModel() {
@@ -42,14 +45,30 @@ class PresetsViewModel @Inject constructor(
     private fun observeSession() {
         viewModelScope.launch {
             getCurrentSession().collect { session ->
-                _uiState.update { it.copy(playingPresetId = session.presetId) }
+                _uiState.update {
+                    it.copy(
+                        playingPresetId = if (session.state == SessionState.PLAYING || session.state == SessionState.PAUSED) {
+                            session.presetId
+                        } else {
+                            null
+                        },
+                        sessionState = session.state
+                    )
+                }
             }
         }
     }
 
     fun playPreset(preset: Preset) {
         viewModelScope.launch {
-            startSession(preset)
+            val currentState = _uiState.value
+            if (currentState.playingPresetId == preset.id) {
+                // Same preset: toggle play/pause
+                playPauseSession(preset)
+            } else {
+                // Different preset: start new session
+                startSession(preset)
+            }
         }
     }
 
@@ -62,5 +81,6 @@ class PresetsViewModel @Inject constructor(
 
 data class PresetsUiState(
     val presets: List<Preset> = emptyList(),
-    val playingPresetId: Long? = null
+    val playingPresetId: Long? = null,
+    val sessionState: SessionState = SessionState.IDLE
 )

@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Nature
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PowerSettingsNew
+import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -170,7 +171,8 @@ fun MixerScreen(
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .verticalScroll(rememberScrollState()),
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 4.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 // Tone Generator Layer
@@ -191,8 +193,34 @@ fun MixerScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(bottom = 8.dp),
-                            horizontalArrangement = Arrangement.End
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Headphones,
+                                    contentDescription = "Binaural",
+                                    tint = if (uiState.toneBinaural) MeditationColors.accentPrimary else MeditationColors.textMuted,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Binaural",
+                                    color = if (uiState.toneBinaural) MeditationColors.textPrimary else MeditationColors.textMuted,
+                                    fontSize = 12.sp
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Switch(
+                                    checked = uiState.toneBinaural,
+                                    onCheckedChange = { viewModel.toggleToneBinaural() },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = MeditationColors.accentPrimary,
+                                        checkedTrackColor = MeditationColors.accentDark,
+                                        uncheckedThumbColor = MeditationColors.textMuted,
+                                        uncheckedTrackColor = MeditationColors.surfaceDark
+                                    )
+                                )
+                            }
                             NeumorphicButton(
                                 onClick = viewModel::toggleTonePreview,
                                 isPressed = uiState.isTonePreviewing,
@@ -706,8 +734,8 @@ private fun FrequencySlider(
         }
         Spacer(modifier = Modifier.height(4.dp))
         NeumorphicSlider(
-            value = (frequency - 1f) / 39f, // 1-40 Hz range
-            onValueChange = { onFrequencyChange(it * 39f + 1f) },
+            value = (frequency - 1f) / 999f, // 1-1000 Hz range
+            onValueChange = { onFrequencyChange(it * 999f + 1f) },
             modifier = Modifier.fillMaxWidth()
         )
         Row(
@@ -718,7 +746,8 @@ private fun FrequencySlider(
             Text(text = "Delta", color = MeditationColors.textMuted, fontSize = 10.sp)
             Text(text = "Theta", color = MeditationColors.textMuted, fontSize = 10.sp)
             Text(text = "Alpha", color = MeditationColors.textMuted, fontSize = 10.sp)
-            Text(text = "40 Hz", color = MeditationColors.textMuted, fontSize = 10.sp)
+            Text(text = "Beta", color = MeditationColors.textMuted, fontSize = 10.sp)
+            Text(text = "1000", color = MeditationColors.textMuted, fontSize = 10.sp)
         }
     }
 }
@@ -731,8 +760,10 @@ private fun SavePresetButton(
     NeumorphicButton(
         onClick = onClick,
         isCircular = false,
+        cornerRadius = 28.dp,
         modifier = modifier
             .fillMaxWidth()
+            .padding(horizontal = 4.dp)
             .height(56.dp)
     ) {
         Row(

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.meditationmixer.core.common.Constants
 import com.meditationmixer.core.domain.usecase.GetSettingsUseCase
 import com.meditationmixer.core.domain.usecase.UpdateSettingsUseCase
+import com.mediationmixer.app.service.ReminderScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,7 +17,8 @@ import javax.inject.Inject
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val getSettings: GetSettingsUseCase,
-    private val updateSettings: UpdateSettingsUseCase
+    private val updateSettings: UpdateSettingsUseCase,
+    private val reminderScheduler: ReminderScheduler
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -32,6 +34,8 @@ class SettingsViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         reminderEnabled = settings.reminderEnabled,
+                        reminderHour = settings.reminderTimeHour,
+                        reminderMinute = settings.reminderTimeMinute,
                         fadeDuration = settings.fadeDurationSeconds,
                         defaultTimerMinutes = settings.defaultTimerMinutes,
                         version = "1.0.0"
@@ -46,7 +50,30 @@ class SettingsViewModel @Inject constructor(
         _uiState.update { it.copy(reminderEnabled = newValue) }
         viewModelScope.launch {
             updateSettings.setReminderEnabled(newValue)
+            if (newValue) {
+                reminderScheduler.schedule(_uiState.value.reminderHour, _uiState.value.reminderMinute)
+            } else {
+                reminderScheduler.cancel()
+            }
         }
+    }
+
+    fun setReminderTime(hour: Int, minute: Int) {
+        _uiState.update { it.copy(reminderHour = hour, reminderMinute = minute, showTimePicker = false) }
+        viewModelScope.launch {
+            updateSettings.setReminderTime(hour, minute)
+            if (_uiState.value.reminderEnabled) {
+                reminderScheduler.schedule(hour, minute)
+            }
+        }
+    }
+
+    fun showTimePicker() {
+        _uiState.update { it.copy(showTimePicker = true) }
+    }
+
+    fun dismissTimePicker() {
+        _uiState.update { it.copy(showTimePicker = false) }
     }
 
     fun setFadeDuration(seconds: Int) {
@@ -64,7 +91,6 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun onSupportClick() {
-        // Open donation link - handled by the UI layer
         _uiState.update { it.copy(showDonationDialog = true) }
     }
 
@@ -75,6 +101,9 @@ class SettingsViewModel @Inject constructor(
 
 data class SettingsUiState(
     val reminderEnabled: Boolean = false,
+    val reminderHour: Int = 22,
+    val reminderMinute: Int = 0,
+    val showTimePicker: Boolean = false,
     val fadeDuration: Int = Constants.DEFAULT_FADE_SECONDS,
     val defaultTimerMinutes: Int = Constants.DEFAULT_TIMER_MINUTES,
     val version: String = "",

@@ -30,13 +30,21 @@ class MixerViewModel @Inject constructor(
     val uiState: StateFlow<MixerUiState> = _uiState.asStateFlow()
 
     fun setToneFrequency(frequency: Float) {
-        _uiState.update { it.copy(toneFrequency = frequency.coerceIn(1f, 40f)) }
+        _uiState.update { it.copy(toneFrequency = frequency.coerceIn(1f, 1000f)) }
         viewModelScope.launch {
             updateLayer(LayerType.TONE, frequency = frequency)
 
             if (_uiState.value.isTonePreviewing) {
                 previewTone(frequencyHz = _uiState.value.toneFrequency, volume = _uiState.value.toneVolume)
             }
+        }
+    }
+
+    fun toggleToneBinaural() {
+        val newBinaural = !_uiState.value.toneBinaural
+        _uiState.update { it.copy(toneBinaural = newBinaural) }
+        viewModelScope.launch {
+            updateLayer(LayerType.TONE, binaural = newBinaural)
         }
     }
 
@@ -206,7 +214,8 @@ class MixerViewModel @Inject constructor(
                         enabled = _uiState.value.toneEnabled,
                         volume = _uiState.value.toneVolume,
                         loop = true,
-                        frequency = _uiState.value.toneFrequency
+                        frequency = _uiState.value.toneFrequency,
+                        binaural = _uiState.value.toneBinaural
                     ),
                     LayerConfig(
                         type = LayerType.USER_AUDIO,
@@ -251,6 +260,7 @@ data class MixerUiState(
     val toneFrequency: Float = 6f,
     val toneVolume: Float = 0.5f,
     val toneEnabled: Boolean = true,
+    val toneBinaural: Boolean = false,
     val isTonePreviewing: Boolean = false,
     val tonePreviewError: String? = null,
     
