@@ -100,6 +100,12 @@ fun MixerScreen(
         }
     }
 
+    val saveToneLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("audio/wav")
+    ) { uri: Uri? ->
+        uri?.let { viewModel.saveToneToUri(context, it) }
+    }
+
     DisposableEffect(Unit) {
         onDispose {
             viewModel.stopTonePreview()
@@ -123,6 +129,19 @@ fun MixerScreen(
         uiState.tonePreviewError?.let {
             snackbarHostState.showSnackbar(it)
             viewModel.consumeTonePreviewError()
+        }
+    }
+
+    LaunchedEffect(uiState.toneSaveSuccess, uiState.toneSaveError) {
+        when {
+            uiState.toneSaveSuccess -> {
+                snackbarHostState.showSnackbar("Tone saved as WAV")
+                viewModel.consumeToneSaveFeedback()
+            }
+            uiState.toneSaveError != null -> {
+                snackbarHostState.showSnackbar(uiState.toneSaveError!!)
+                viewModel.consumeToneSaveFeedback()
+            }
         }
     }
 
@@ -221,27 +240,52 @@ fun MixerScreen(
                                     )
                                 )
                             }
-                            NeumorphicButton(
-                                onClick = viewModel::toggleTonePreview,
-                                isPressed = uiState.isTonePreviewing,
-                                modifier = Modifier.size(44.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .clip(CircleShape)
-                                        .background(
-                                            if (uiState.isTonePreviewing) MeditationColors.accentGradient
-                                            else MeditationColors.buttonGradient
-                                        ),
-                                    contentAlignment = Alignment.Center
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                NeumorphicButton(
+                                    onClick = viewModel::toggleTonePreview,
+                                    isPressed = uiState.isTonePreviewing,
+                                    modifier = Modifier.size(44.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = if (uiState.isTonePreviewing) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                        contentDescription = if (uiState.isTonePreviewing) "Stop preview" else "Preview tone",
-                                        tint = MeditationColors.textPrimary,
-                                        modifier = Modifier.size(20.dp)
-                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                if (uiState.isTonePreviewing) MeditationColors.accentGradient
+                                                else MeditationColors.buttonGradient
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = if (uiState.isTonePreviewing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                            contentDescription = if (uiState.isTonePreviewing) "Stop preview" else "Preview tone",
+                                            tint = MeditationColors.textPrimary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                                NeumorphicButton(
+                                    onClick = { saveToneLauncher.launch(viewModel.getToneSaveFilename()) },
+                                    isPressed = uiState.isSavingTone,
+                                    modifier = Modifier.size(44.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                if (uiState.isSavingTone) MeditationColors.accentGradient
+                                                else MeditationColors.buttonGradient
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Save,
+                                            contentDescription = "Save tone as WAV",
+                                            tint = MeditationColors.textPrimary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
                                 }
                             }
                         }

@@ -13,6 +13,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import java.io.OutputStream
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import kotlin.math.PI
 import kotlin.math.sin
 
@@ -233,6 +236,75 @@ class ToneGenerator {
             audioTrack = null
             onComplete()
         }
+    }
+
+    fun generateWavToStream(
+        outputStream: OutputStream,
+        durationSeconds: Int,
+        frequencyHz: Float,
+        volume: Float,
+        binaural: Boolean,
+        carrierFreqHz: Float = 220f
+    ) {
+        val numChannels = if (binaural) 2 else 1
+        val bitsPerSample = 16
+        val totalSamples = sampleRate * durationSeconds
+        val dataSize = totalSamples * numChannels * (bitsPerSample / 8)
+
+        // Write WAV header (44 bytes)
+        val header = ByteBuffer.allocate(44).order(ByteOrder.LITTLE_ENDIAN)
+        header.put("RIFF".toByteArray())
+        header.putInt(36 + dataSize)
+        header.put("WAVE".toByteArray())
+        header.put("fmt ".toByteArray())
+        header.putInt(16) // PCM chunk size
+        header.putShort(1) // PCM format
+        header.putShort(numChannels.toShort())
+        header.putInt(sampleRate)
+        header.putInt(sampleRate * numChannels * bitsPerSample / 8)
+        header.putShort((numChannels * bitsPerSample / 8).toShort())
+        header.putShort(bitsPerSample.toShort())
+        header.put("data".toByteArray())
+        header.putInt(dataSize)
+        outputStream.write(header.array())
+
+        // Generate PCM data in chunks
+        val chunkSamples = 4096
+        val vol = volume.coerceIn(0f, 1f)
+        var leftPhase = 0.0
+        var rightPhase = 0.0
+        val leftFreq = carrierFreqHz.toDouble()
+        val rightFreq = (carrierFreqHz + frequencyHz).toDouble()
+        val leftIncrement = 2.0 * PI * leftFreq / sampleRate
+        val rightIncrement = 2.0 * PI * rightFreq / sampleRate
+        var samplesWritten = 0
+
+        while (samplesWritten < totalSamples) {
+            val count = minOf(chunkSamples, totalSamples - samplesWritten)
+            val buf = ByteBuffer.allocate(count * numChannels * 2).order(ByteOrder.LITTLE_ENDIAN)
+
+            for (i in 0 until count) {
+                if (binaural) {
+                    val left = (sin(leftPhase) * vol * Short.MAX_VALUE).toInt().toShort()
+                    val right = (sin(rightPhase) * vol * Short.MAX_VALUE).toInt().toShort()
+                    buf.putShort(left)
+                    buf.putShort(right)
+                } else {
+                    val sample = ((sin(leftPhase) + sin(rightPhase)) * 0.5 * vol * Short.MAX_VALUE).toInt().toShort()
+                    buf.putShort(sample)
+                }
+
+                leftPhase += leftIncrement
+                if (leftPhase >= 2.0 * PI) leftPhase -= 2.0 * PI
+                rightPhase += rightIncrement
+                if (rightPhase >= 2.0 * PI) rightPhase -= 2.0 * PI
+            }
+
+            outputStream.write(buf.array())
+            samplesWritten += count
+        }
+
+        outputStream.flush()
     }
 
     fun release() {

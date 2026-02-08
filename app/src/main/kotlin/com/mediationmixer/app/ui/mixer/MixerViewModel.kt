@@ -1,5 +1,7 @@
 package com.mediationmixer.app.ui.mixer
 
+import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.meditationmixer.core.domain.model.LayerConfig
@@ -8,6 +10,7 @@ import com.meditationmixer.core.domain.model.Preset
 import com.meditationmixer.core.domain.usecase.GetSettingsUseCase
 import com.meditationmixer.core.domain.usecase.PreviewToneUseCase
 import com.meditationmixer.core.domain.usecase.SavePresetUseCase
+import com.meditationmixer.core.domain.usecase.SaveToneUseCase
 import com.meditationmixer.core.domain.usecase.UpdateLayerUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,7 +26,8 @@ class MixerViewModel @Inject constructor(
     private val updateLayer: UpdateLayerUseCase,
     private val savePresetUseCase: SavePresetUseCase,
     private val getSettings: GetSettingsUseCase,
-    private val previewTone: PreviewToneUseCase
+    private val previewTone: PreviewToneUseCase,
+    private val saveToneUseCase: SaveToneUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MixerUiState())
@@ -197,6 +201,37 @@ class MixerViewModel @Inject constructor(
         }
     }
 
+    fun getToneSaveFilename(): String {
+        val freqLabel = _uiState.value.toneFrequency.toInt()
+        val mode = if (_uiState.value.toneBinaural) "binaural" else "mono"
+        return "tone_${freqLabel}hz_$mode.wav"
+    }
+
+    fun saveToneToUri(context: Context, uri: Uri) {
+        _uiState.update { it.copy(isSavingTone = true, toneSaveSuccess = false, toneSaveError = null) }
+        viewModelScope.launch {
+            runCatching {
+                context.contentResolver.openOutputStream(uri)?.use { stream ->
+                    saveToneUseCase(
+                        outputStream = stream,
+                        durationSeconds = 30,
+                        frequencyHz = _uiState.value.toneFrequency,
+                        volume = _uiState.value.toneVolume,
+                        binaural = _uiState.value.toneBinaural
+                    )
+                } ?: throw IllegalStateException("Could not open output stream")
+            }.onSuccess {
+                _uiState.update { it.copy(isSavingTone = false, toneSaveSuccess = true) }
+            }.onFailure { e ->
+                _uiState.update { it.copy(isSavingTone = false, toneSaveError = "Failed to save: ${e.message}") }
+            }
+        }
+    }
+
+    fun consumeToneSaveFeedback() {
+        _uiState.update { it.copy(toneSaveSuccess = false, toneSaveError = null) }
+    }
+
     fun savePreset() {
         viewModelScope.launch {
             val settings = getSettings().first()
@@ -263,6 +298,9 @@ data class MixerUiState(
     val toneBinaural: Boolean = false,
     val isTonePreviewing: Boolean = false,
     val tonePreviewError: String? = null,
+    val isSavingTone: Boolean = false,
+    val toneSaveSuccess: Boolean = false,
+    val toneSaveError: String? = null,
     
     // User audio layer
     val userAudioUri: String? = null,

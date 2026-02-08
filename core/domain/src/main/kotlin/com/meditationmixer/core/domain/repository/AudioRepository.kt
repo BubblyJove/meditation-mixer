@@ -2,6 +2,7 @@ package com.meditationmixer.core.domain.repository
 
 import com.meditationmixer.core.domain.model.LayerConfig
 import com.meditationmixer.core.domain.model.LayerType
+import java.io.OutputStream
 import kotlinx.coroutines.flow.Flow
 
 interface AudioRepository {
@@ -24,4 +25,12 @@ interface AudioRepository {
 
     suspend fun previewTone(frequencyHz: Float, volume: Float)
     suspend fun stopTonePreview()
+
+    suspend fun generateToneWav(
+        outputStream: OutputStream,
+        durationSeconds: Int,
+        frequencyHz: Float,
+        volume: Float,
+        binaural: Boolean
+    )
 }

@@ -10,9 +10,12 @@ import com.meditationmixer.core.domain.model.LayerConfig
 import com.meditationmixer.core.domain.model.LayerType
 import com.meditationmixer.core.domain.repository.AudioRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
+import java.io.OutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -132,5 +135,24 @@ class AudioRepositoryImpl @Inject constructor(
 
     override suspend fun stopTonePreview() {
         previewToneGenerator.stop()
+    }
+
+    override suspend fun generateToneWav(
+        outputStream: OutputStream,
+        durationSeconds: Int,
+        frequencyHz: Float,
+        volume: Float,
+        binaural: Boolean
+    ) {
+        withContext(Dispatchers.IO) {
+            val generator = ToneGenerator()
+            generator.generateWavToStream(
+                outputStream = outputStream,
+                durationSeconds = durationSeconds,
+                frequencyHz = frequencyHz,
+                volume = volume,
+                binaural = binaural
+            )
+        }
     }
 }
