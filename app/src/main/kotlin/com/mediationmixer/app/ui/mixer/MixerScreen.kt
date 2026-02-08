@@ -709,12 +709,28 @@ private fun LayerCard(
     }
 }
 
+private data class FrequencyPreset(val label: String, val hz: Float, val description: String)
+
+private val frequencyPresets = listOf(
+    FrequencyPreset("Delta", 2f, "Deep sleep"),
+    FrequencyPreset("Theta", 6f, "Meditation"),
+    FrequencyPreset("Alpha", 10f, "Relaxed"),
+    FrequencyPreset("Beta", 20f, "Focus"),
+    FrequencyPreset("Gamma", 40f, "Awareness")
+)
+
 @Composable
 private fun FrequencySlider(
     frequency: Float,
     onFrequencyChange: (Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Find nearest preset for highlight
+    val nearestPreset = frequencyPresets.minByOrNull {
+        kotlin.math.abs(it.hz - frequency)
+    }
+    val isOnPreset = nearestPreset != null && kotlin.math.abs(nearestPreset.hz - frequency) < 0.5f
+
     Column(modifier = modifier.padding(top = 12.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -726,28 +742,76 @@ private fun FrequencySlider(
                 fontSize = 12.sp
             )
             Text(
-                text = "${frequency.toInt()} Hz",
+                text = if (frequency < 100f) "${"%.1f".format(frequency)} Hz" else "${frequency.toInt()} Hz",
                 color = MeditationColors.accentPrimary,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium
             )
         }
-        Spacer(modifier = Modifier.height(4.dp))
-        NeumorphicSlider(
-            value = (frequency - 1f) / 999f, // 1-1000 Hz range
-            onValueChange = { onFrequencyChange(it * 999f + 1f) },
-            modifier = Modifier.fillMaxWidth()
-        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Tappable preset chips
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Text(text = "1 Hz", color = MeditationColors.textMuted, fontSize = 10.sp)
-            Text(text = "Delta", color = MeditationColors.textMuted, fontSize = 10.sp)
-            Text(text = "Theta", color = MeditationColors.textMuted, fontSize = 10.sp)
-            Text(text = "Alpha", color = MeditationColors.textMuted, fontSize = 10.sp)
-            Text(text = "Beta", color = MeditationColors.textMuted, fontSize = 10.sp)
-            Text(text = "1000", color = MeditationColors.textMuted, fontSize = 10.sp)
+            frequencyPresets.forEach { preset ->
+                val isSelected = nearestPreset == preset && isOnPreset
+                NeumorphicButton(
+                    onClick = { onFrequencyChange(preset.hz) },
+                    isPressed = isSelected,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp),
+                    isCircular = false,
+                    cornerRadius = 12.dp
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                if (isSelected) MeditationColors.accentGradient
+                                else MeditationColors.buttonGradient
+                            ),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = preset.label,
+                            color = if (isSelected) MeditationColors.textPrimary else MeditationColors.textSecondary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "${preset.hz.toInt()} Hz",
+                            color = if (isSelected) MeditationColors.textPrimary.copy(alpha = 0.7f) else MeditationColors.textMuted,
+                            fontSize = 9.sp
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Fine-tune slider: ±10 Hz around current value, clamped to 1-1000
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Fine-tune",
+                color = MeditationColors.textMuted,
+                fontSize = 10.sp
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            NeumorphicSlider(
+                value = ((frequency - 1f) / 999f).coerceIn(0f, 1f),
+                onValueChange = { onFrequencyChange(it * 999f + 1f) },
+                modifier = Modifier.weight(1f)
+            )
         }
     }
 }

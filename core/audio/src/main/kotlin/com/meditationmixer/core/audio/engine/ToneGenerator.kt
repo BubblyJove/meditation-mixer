@@ -100,23 +100,25 @@ class ToneGenerator {
 
     private suspend fun CoroutineScope.generateTone() {
         val samples = ShortArray(bufferSize / 2)
-        var carrierPhase = 0.0
-        var modPhase = 0.0
+        var leftPhase = 0.0
+        var rightPhase = 0.0
 
         while (isActive && _isPlaying.value) {
-            val carrierIncrement = 2.0 * PI * carrierHz / sampleRate
-            val modIncrement = 2.0 * PI * frequencyHz / sampleRate
+            val leftFreq = carrierHz.toDouble()
+            val rightFreq = (carrierHz + frequencyHz).toDouble()
+            val leftIncrement = 2.0 * PI * leftFreq / sampleRate
+            val rightIncrement = 2.0 * PI * rightFreq / sampleRate
 
             for (i in samples.indices) {
-                val mod = ((sin(modPhase) + 1.0) * 0.5)
-                val sample = sin(carrierPhase) * mod * Short.MAX_VALUE
+                // Monaural beats: sum two close frequencies for smooth interference
+                val sample = (sin(leftPhase) + sin(rightPhase)) * 0.5 * Short.MAX_VALUE
                 samples[i] = sample.toInt().toShort()
 
-                carrierPhase += carrierIncrement
-                if (carrierPhase >= 2.0 * PI) carrierPhase -= 2.0 * PI
+                leftPhase += leftIncrement
+                if (leftPhase >= 2.0 * PI) leftPhase -= 2.0 * PI
 
-                modPhase += modIncrement
-                if (modPhase >= 2.0 * PI) modPhase -= 2.0 * PI
+                rightPhase += rightIncrement
+                if (rightPhase >= 2.0 * PI) rightPhase -= 2.0 * PI
             }
 
             audioTrack?.write(samples, 0, samples.size)

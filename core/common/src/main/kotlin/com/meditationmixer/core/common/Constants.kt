@@ -20,6 +20,7 @@ object Constants {
         const val THETA_6HZ = 6f
         const val ALPHA_10HZ = 10f
         const val BETA_20HZ = 20f
+        const val GAMMA_40HZ = 40f
     }
     
     // Audio
