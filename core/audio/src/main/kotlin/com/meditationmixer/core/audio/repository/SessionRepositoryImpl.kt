@@ -2,6 +2,7 @@ package com.meditationmixer.core.audio.repository
 
 import com.meditationmixer.core.audio.engine.AudioEngine
 import com.meditationmixer.core.common.Constants
+import com.meditationmixer.core.common.DispatcherProvider
 import com.meditationmixer.core.data.database.dao.SessionHistoryDao
 import com.meditationmixer.core.data.database.entity.SessionHistoryEntity
 import com.meditationmixer.core.domain.model.Session
@@ -30,10 +31,11 @@ class SessionRepositoryImpl @Inject constructor(
     private val presetRepository: PresetRepository,
     private val settingsRepository: SettingsRepository,
     private val streakRepository: StreakRepository,
-    private val sessionHistoryDao: SessionHistoryDao
+    private val sessionHistoryDao: SessionHistoryDao,
+    private val dispatcherProvider: DispatcherProvider
 ) : SessionRepository {
-    
-    private val scope = CoroutineScope(Dispatchers.Main)
+
+    private val scope = CoroutineScope(dispatcherProvider.main)
     private var timerJob: Job? = null
     
     private val _currentSession = MutableStateFlow(Session())

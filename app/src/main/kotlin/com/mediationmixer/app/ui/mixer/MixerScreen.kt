@@ -498,11 +498,14 @@ private fun MixerVisual(
         label = "phase"
     )
 
-    val activity = listOf(
-        if (toneEnabled) toneVolume.coerceIn(0f, 1f) else 0f,
-        if (userAudioEnabled) userAudioVolume.coerceIn(0f, 1f) else 0f,
-        if (ambienceEnabled) ambienceVolume.coerceIn(0f, 1f) else 0f
-    )
+    val activity = remember(toneEnabled, userAudioEnabled, ambienceEnabled,
+                            toneVolume, userAudioVolume, ambienceVolume) {
+        listOf(
+            if (toneEnabled) toneVolume.coerceIn(0f, 1f) else 0f,
+            if (userAudioEnabled) userAudioVolume.coerceIn(0f, 1f) else 0f,
+            if (ambienceEnabled) ambienceVolume.coerceIn(0f, 1f) else 0f
+        )
+    }
 
     NeumorphicCard(
         modifier = modifier

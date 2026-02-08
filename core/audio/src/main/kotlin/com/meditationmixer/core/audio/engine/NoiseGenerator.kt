@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlin.math.sin
 import kotlin.random.Random
@@ -82,6 +83,20 @@ class NoiseGenerator {
     private val bufferSize = Constants.AUDIO_BUFFER_SIZE
 
     private val random = Random(System.currentTimeMillis())
+
+    // Pre-calculated constants to avoid per-sample computation
+    private val cricketChirpDuration = (sampleRate * 0.06).toInt()
+    private val cricketMinInterval = sampleRate / 4
+    private val cricketPhaseInc1 = 2.0 * Math.PI * 4200.0 / sampleRate
+    private val cricketPhaseInc2 = 2.0 * Math.PI * 4600.0 / sampleRate
+    private val frogChirpDuration = (sampleRate * 0.15).toInt()
+    private val frogMinInterval = sampleRate * 2
+    private val frogPhaseInc = 2.0 * Math.PI * 180.0 / sampleRate
+    private val bubbleDuration = (sampleRate * 0.02).toInt()
+    private val bubbleMinInterval = sampleRate / 8
+    private val thunderMinInterval = sampleRate * 4
+    private val oceanLfoInc = 2.0 * Math.PI * 0.10 / sampleRate
+    private val riverLfoInc = 2.0 * Math.PI * 0.25 / sampleRate
 
     fun setProfile(newProfile: Profile) {
         profile = newProfile
@@ -172,8 +187,7 @@ class NoiseGenerator {
                     Profile.RIVER -> riverNoise(white)
                 }
 
-                val v = (shaped.coerceIn(-1f, 1f) * Short.MAX_VALUE).toInt()
-                samples[i] = v.coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
+                samples[i] = (shaped.coerceIn(-1f, 1f) * Short.MAX_VALUE).toInt().toShort()
             }
 
             audioTrack?.write(samples, 0, samples.size)
@@ -219,7 +233,7 @@ class NoiseGenerator {
 
         // Thunder rumble
         thunderTimer++
-        if (!thunderActive && thunderTimer > sampleRate * 4 && random.nextFloat() > 0.99998f) {
+        if (!thunderActive && thunderTimer > thunderMinInterval && random.nextFloat() > 0.99998f) {
             thunderActive = true
             thunderDecay = 0.6f
             thunderTimer = 0
@@ -247,7 +261,7 @@ class NoiseGenerator {
         val base = brownNoise(white)
         lowPass = lowPass + 0.0025f * (base - lowPass)
 
-        oceanLfoPhase += (2.0 * Math.PI * 0.10) / sampleRate
+        oceanLfoPhase += oceanLfoInc
         if (oceanLfoPhase >= 2.0 * Math.PI) oceanLfoPhase -= 2.0 * Math.PI
         val swell = (0.65 + 0.35 * sin(oceanLfoPhase)).toFloat()
         return lowPass * swell
@@ -262,20 +276,20 @@ class NoiseGenerator {
 
         // Cricket chirps: periodic bursts of high-frequency oscillation
         cricketChirpTimer++
-        if (!cricketChirpActive && cricketChirpTimer > sampleRate / 4) {
+        if (!cricketChirpActive && cricketChirpTimer > cricketMinInterval) {
             if (random.nextFloat() > 0.9997f) {
                 cricketChirpActive = true
                 cricketChirpTimer = 0
             }
         }
         val cricket = if (cricketChirpActive) {
-            cricketPhase1 += 2.0 * Math.PI * 4200.0 / sampleRate
-            cricketPhase2 += 2.0 * Math.PI * 4600.0 / sampleRate
+            cricketPhase1 += cricketPhaseInc1
+            cricketPhase2 += cricketPhaseInc2
             if (cricketPhase1 >= 2.0 * Math.PI) cricketPhase1 -= 2.0 * Math.PI
             if (cricketPhase2 >= 2.0 * Math.PI) cricketPhase2 -= 2.0 * Math.PI
 
-            val chirpEnv = sin(Math.PI * cricketChirpTimer.toDouble() / (sampleRate * 0.06)).toFloat().coerceIn(0f, 1f)
-            if (cricketChirpTimer > (sampleRate * 0.06).toInt()) {
+            val chirpEnv = sin(Math.PI * cricketChirpTimer.toDouble() / cricketChirpDuration).toFloat().coerceIn(0f, 1f)
+            if (cricketChirpTimer > cricketChirpDuration) {
                 cricketChirpActive = false
                 cricketChirpTimer = 0
             }
@@ -284,17 +298,17 @@ class NoiseGenerator {
 
         // Occasional frog croak: low frequency burst
         frogTimer++
-        if (!frogActive && frogTimer > sampleRate * 2) {
+        if (!frogActive && frogTimer > frogMinInterval) {
             if (random.nextFloat() > 0.9999f) {
                 frogActive = true
                 frogTimer = 0
             }
         }
         val frog = if (frogActive) {
-            frogPhase += 2.0 * Math.PI * 180.0 / sampleRate
+            frogPhase += frogPhaseInc
             if (frogPhase >= 2.0 * Math.PI) frogPhase -= 2.0 * Math.PI
-            val env = sin(Math.PI * frogTimer.toDouble() / (sampleRate * 0.15)).toFloat().coerceIn(0f, 1f)
-            if (frogTimer > (sampleRate * 0.15).toInt()) {
+            val env = sin(Math.PI * frogTimer.toDouble() / frogChirpDuration).toFloat().coerceIn(0f, 1f)
+            if (frogTimer > frogChirpDuration) {
                 frogActive = false
                 frogTimer = 0
             }
@@ -313,13 +327,13 @@ class NoiseGenerator {
         val flow = riverLowPass1 * 0.6f + (pink - riverLowPass2) * 0.35f
 
         // Subtle LFO variation for flow dynamics
-        oceanLfoPhase += (2.0 * Math.PI * 0.25) / sampleRate
+        oceanLfoPhase += riverLfoInc
         if (oceanLfoPhase >= 2.0 * Math.PI) oceanLfoPhase -= 2.0 * Math.PI
         val flowMod = (0.8 + 0.2 * sin(oceanLfoPhase)).toFloat()
 
         // Bubble pops
         riverBubbleTimer++
-        if (!riverBubbleActive && riverBubbleTimer > sampleRate / 8) {
+        if (!riverBubbleActive && riverBubbleTimer > bubbleMinInterval) {
             if (random.nextFloat() > 0.9995f) {
                 riverBubbleActive = true
                 riverBubbleTimer = 0
@@ -330,8 +344,8 @@ class NoiseGenerator {
             val freq = 800.0 + random.nextDouble() * 400.0
             riverBubblePhase += 2.0 * Math.PI * freq / sampleRate
             if (riverBubblePhase >= 2.0 * Math.PI) riverBubblePhase -= 2.0 * Math.PI
-            val env = sin(Math.PI * riverBubbleTimer.toDouble() / (sampleRate * 0.02)).toFloat().coerceIn(0f, 1f)
-            if (riverBubbleTimer > (sampleRate * 0.02).toInt()) {
+            val env = sin(Math.PI * riverBubbleTimer.toDouble() / bubbleDuration).toFloat().coerceIn(0f, 1f)
+            if (riverBubbleTimer > bubbleDuration) {
                 riverBubbleActive = false
                 riverBubbleTimer = 0
             }
@@ -357,5 +371,6 @@ class NoiseGenerator {
 
     fun release() {
         stop()
+        scope.cancel()
     }
 }

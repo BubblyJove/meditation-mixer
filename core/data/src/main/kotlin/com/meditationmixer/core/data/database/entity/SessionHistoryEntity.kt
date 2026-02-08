@@ -1,10 +1,14 @@
 package com.meditationmixer.core.data.database.entity
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.meditationmixer.core.domain.model.SessionHistory
 
-@Entity(tableName = "session_history")
+@Entity(
+    tableName = "session_history",
+    indices = [Index("startedAt"), Index("completed")]
+)
 data class SessionHistoryEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,

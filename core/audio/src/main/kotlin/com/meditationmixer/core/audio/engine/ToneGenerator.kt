@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.sin
@@ -236,5 +237,6 @@ class ToneGenerator {
 
     fun release() {
         stop()
+        scope.cancel()
     }
 }

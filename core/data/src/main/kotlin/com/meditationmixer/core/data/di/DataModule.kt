@@ -36,6 +36,7 @@ object DatabaseModule {
             MeditationDatabase.DATABASE_NAME
         )
             .addCallback(DatabaseCallback())
+            .addMigrations(MeditationDatabase.MIGRATION_1_2)
             .build()
     }
     

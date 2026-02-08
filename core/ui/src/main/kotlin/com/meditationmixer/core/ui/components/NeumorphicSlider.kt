@@ -4,8 +4,8 @@ import android.graphics.BlurMaskFilter
 import android.graphics.Paint as AndroidPaint
 import android.graphics.RectF
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -22,7 +22,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
@@ -48,27 +47,65 @@ fun NeumorphicSlider(
     val thumbSize = 28.dp
     val thumbSizePx = with(density) { thumbSize.toPx() }
     val trackHeight = 8.dp
-    
+
     val normalizedValue = ((value - valueRange.start) / (valueRange.endInclusive - valueRange.start))
         .coerceIn(0f, 1f)
-    
+
+    // Pre-calculate track shadow paints
+    val trackBlurPx = remember { with(density) { 3.dp.toPx().coerceAtLeast(1f) } }
+    val trackOffsetPx = remember(trackBlurPx) { trackBlurPx / 2f }
+    val trackCornerPx = remember { with(density) { 4.dp.toPx() } }
+    val trackDarkPaint = remember {
+        AndroidPaint().apply {
+            isAntiAlias = true
+            color = MeditationColors.neuShadowDark.copy(alpha = 0.55f).toArgb()
+            maskFilter = BlurMaskFilter(trackBlurPx, BlurMaskFilter.Blur.NORMAL)
+        }
+    }
+    val trackLightPaint = remember {
+        AndroidPaint().apply {
+            isAntiAlias = true
+            color = MeditationColors.neuShadowLight.copy(alpha = 0.25f).toArgb()
+            maskFilter = BlurMaskFilter(trackBlurPx, BlurMaskFilter.Blur.NORMAL)
+        }
+    }
+
+    // Pre-calculate thumb shadow paints
+    val thumbBlurPx = remember { with(density) { 6.dp.toPx().coerceAtLeast(1f) } }
+    val thumbOffsetPx = remember(thumbBlurPx) { thumbBlurPx / 2f }
+    val thumbDarkPaint = remember {
+        AndroidPaint().apply {
+            isAntiAlias = true
+            color = Color.Black.copy(alpha = 0.35f).toArgb()
+            maskFilter = BlurMaskFilter(thumbBlurPx, BlurMaskFilter.Blur.NORMAL)
+        }
+    }
+    val thumbLightPaint = remember {
+        AndroidPaint().apply {
+            isAntiAlias = true
+            color = Color.White.copy(alpha = 0.18f).toArgb()
+            maskFilter = BlurMaskFilter(thumbBlurPx, BlurMaskFilter.Blur.NORMAL)
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(thumbSize)
             .onSizeChanged { sliderWidth = it.width.toFloat() }
             .pointerInput(Unit) {
-                detectTapGestures { offset ->
-                    val newValue = (offset.x / sliderWidth).coerceIn(0f, 1f)
-                    val mappedValue = valueRange.start + newValue * (valueRange.endInclusive - valueRange.start)
-                    onValueChange(mappedValue)
-                }
-            }
-            .pointerInput(Unit) {
-                detectHorizontalDragGestures { change, _ ->
-                    val newValue = (change.position.x / sliderWidth).coerceIn(0f, 1f)
-                    val mappedValue = valueRange.start + newValue * (valueRange.endInclusive - valueRange.start)
-                    onValueChange(mappedValue)
+                awaitEachGesture {
+                    val down = awaitFirstDown()
+                    val newValue = (down.position.x / sliderWidth).coerceIn(0f, 1f)
+                    onValueChange(valueRange.start + newValue * (valueRange.endInclusive - valueRange.start))
+
+                    do {
+                        val event = awaitPointerEvent()
+                        val pos = event.changes.firstOrNull()?.position ?: break
+                        val dragValue = (pos.x / sliderWidth).coerceIn(0f, 1f)
+                        onValueChange(valueRange.start + dragValue * (valueRange.endInclusive - valueRange.start))
+                        event.changes.forEach { it.consume() }
+                    } while (event.changes.any { it.pressed })
                 }
             },
         contentAlignment = Alignment.CenterStart
@@ -81,46 +118,32 @@ fun NeumorphicSlider(
                 .clip(RoundedCornerShape(4.dp))
                 .background(Color.Black)
                 .drawBehind {
-                    val blurPx = 3.dp.toPx().coerceAtLeast(1f)
-                    val offsetPx = blurPx / 2f
-                    val r = 4.dp.toPx()
                     val rect = RectF(0f, 0f, size.width, size.height)
-
-                    val darkPaint = AndroidPaint().apply {
-                        isAntiAlias = true
-                        color = MeditationColors.neuShadowDark.copy(alpha = 0.55f).toArgb()
-                        maskFilter = BlurMaskFilter(blurPx, BlurMaskFilter.Blur.NORMAL)
-                    }
-                    val lightPaint = AndroidPaint().apply {
-                        isAntiAlias = true
-                        color = MeditationColors.neuShadowLight.copy(alpha = 0.25f).toArgb()
-                        maskFilter = BlurMaskFilter(blurPx, BlurMaskFilter.Blur.NORMAL)
-                    }
 
                     drawIntoCanvas { canvas ->
                         val nativeCanvas = canvas.nativeCanvas
                         nativeCanvas.drawRoundRect(
-                            rect.left + offsetPx,
-                            rect.top + offsetPx,
-                            rect.right + offsetPx,
-                            rect.bottom + offsetPx,
-                            r,
-                            r,
-                            darkPaint
+                            rect.left + trackOffsetPx,
+                            rect.top + trackOffsetPx,
+                            rect.right + trackOffsetPx,
+                            rect.bottom + trackOffsetPx,
+                            trackCornerPx,
+                            trackCornerPx,
+                            trackDarkPaint
                         )
                         nativeCanvas.drawRoundRect(
-                            rect.left - offsetPx,
-                            rect.top - offsetPx,
-                            rect.right - offsetPx,
-                            rect.bottom - offsetPx,
-                            r,
-                            r,
-                            lightPaint
+                            rect.left - trackOffsetPx,
+                            rect.top - trackOffsetPx,
+                            rect.right - trackOffsetPx,
+                            rect.bottom - trackOffsetPx,
+                            trackCornerPx,
+                            trackCornerPx,
+                            trackLightPaint
                         )
                     }
                 }
         )
-        
+
         // Active track (gradient fill)
         Box(
             modifier = Modifier
@@ -129,7 +152,7 @@ fun NeumorphicSlider(
                 .clip(RoundedCornerShape(4.dp))
                 .background(MeditationColors.sliderTrackGradient)
         )
-        
+
         // Thumb
         Box(
             modifier = Modifier
@@ -139,35 +162,22 @@ fun NeumorphicSlider(
                 }
                 .size(thumbSize)
                 .drawBehind {
-                    val blurPx = 6.dp.toPx().coerceAtLeast(1f)
-                    val offsetPx = blurPx / 2f
-                    val radius = (size.minDimension / 2f - blurPx).coerceAtLeast(0f)
+                    val radius = (size.minDimension / 2f - thumbBlurPx).coerceAtLeast(0f)
 
                     if (radius > 0f) {
-                        val darkPaint = AndroidPaint().apply {
-                            isAntiAlias = true
-                            color = Color.Black.copy(alpha = 0.35f).toArgb()
-                            maskFilter = BlurMaskFilter(blurPx, BlurMaskFilter.Blur.NORMAL)
-                        }
-                        val lightPaint = AndroidPaint().apply {
-                            isAntiAlias = true
-                            color = Color.White.copy(alpha = 0.18f).toArgb()
-                            maskFilter = BlurMaskFilter(blurPx, BlurMaskFilter.Blur.NORMAL)
-                        }
-
                         drawIntoCanvas { canvas ->
                             val nativeCanvas = canvas.nativeCanvas
                             nativeCanvas.drawCircle(
-                                center.x + offsetPx,
-                                center.y + offsetPx,
+                                center.x + thumbOffsetPx,
+                                center.y + thumbOffsetPx,
                                 radius,
-                                darkPaint
+                                thumbDarkPaint
                             )
                             nativeCanvas.drawCircle(
-                                center.x - offsetPx,
-                                center.y - offsetPx,
+                                center.x - thumbOffsetPx,
+                                center.y - thumbOffsetPx,
                                 radius,
-                                lightPaint
+                                thumbLightPaint
                             )
                         }
                     }

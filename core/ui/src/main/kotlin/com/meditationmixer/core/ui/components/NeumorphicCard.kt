@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -21,6 +22,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.meditationmixer.core.ui.theme.MeditationColors
@@ -36,7 +38,7 @@ fun NeumorphicCard(
 ) {
     val shape: Shape = if (isCircular) CircleShape else RoundedCornerShape(cornerRadius)
     val interactionSource = remember { MutableInteractionSource() }
-    
+
     Box(
         modifier = modifier
             .neumorphicCardShadow(
@@ -80,62 +82,69 @@ fun Modifier.neumorphicCardShadow(
     lightColor: Color = MeditationColors.neuShadowLight.copy(alpha = 0.3f),
     darkColor: Color = MeditationColors.neuShadowDark.copy(alpha = 0.5f),
     shadowRadius: Dp = 10.dp
-): Modifier = this.drawBehind {
-    if (!isPressed) {
-        val blurPx = shadowRadius.toPx().coerceAtLeast(1f)
-        val offsetPx = blurPx / 2f
+): Modifier = composed {
+    val density = LocalDensity.current
+    val blurPx = remember(shadowRadius) { with(density) { shadowRadius.toPx().coerceAtLeast(1f) } }
+    val offsetPx = remember(blurPx) { blurPx / 2f }
+    val cornerPx = remember(cornerRadius) { with(density) { cornerRadius.toPx().coerceAtLeast(0f) } }
 
-        val darkPaint = AndroidPaint().apply {
+    val darkPaint = remember(darkColor, blurPx) {
+        AndroidPaint().apply {
             isAntiAlias = true
             color = darkColor.toArgb()
             maskFilter = BlurMaskFilter(blurPx, BlurMaskFilter.Blur.NORMAL)
         }
-        val lightPaint = AndroidPaint().apply {
+    }
+    val lightPaint = remember(lightColor, blurPx) {
+        AndroidPaint().apply {
             isAntiAlias = true
             color = lightColor.toArgb()
             maskFilter = BlurMaskFilter(blurPx, BlurMaskFilter.Blur.NORMAL)
         }
+    }
 
-        drawIntoCanvas { canvas ->
-            val nativeCanvas = canvas.nativeCanvas
+    this.drawBehind {
+        if (!isPressed) {
+            drawIntoCanvas { canvas ->
+                val nativeCanvas = canvas.nativeCanvas
 
-            if (isCircular) {
-                val radius = size.minDimension / 2f
+                if (isCircular) {
+                    val radius = size.minDimension / 2f
 
-                nativeCanvas.drawCircle(
-                    center.x + offsetPx,
-                    center.y + offsetPx,
-                    radius,
-                    darkPaint
-                )
-                nativeCanvas.drawCircle(
-                    center.x - offsetPx,
-                    center.y - offsetPx,
-                    radius,
-                    lightPaint
-                )
-            } else {
-                val r = cornerRadius.toPx().coerceAtLeast(0f)
-                val rect = RectF(0f, 0f, size.width, size.height)
+                    nativeCanvas.drawCircle(
+                        center.x + offsetPx,
+                        center.y + offsetPx,
+                        radius,
+                        darkPaint
+                    )
+                    nativeCanvas.drawCircle(
+                        center.x - offsetPx,
+                        center.y - offsetPx,
+                        radius,
+                        lightPaint
+                    )
+                } else {
+                    val rect = RectF(0f, 0f, size.width, size.height)
 
-                nativeCanvas.drawRoundRect(
-                    rect.left + offsetPx,
-                    rect.top + offsetPx,
-                    rect.right + offsetPx,
-                    rect.bottom + offsetPx,
-                    r,
-                    r,
-                    darkPaint
-                )
-                nativeCanvas.drawRoundRect(
-                    rect.left - offsetPx,
-                    rect.top - offsetPx,
-                    rect.right - offsetPx,
-                    rect.bottom - offsetPx,
-                    r,
-                    r,
-                    lightPaint
-                )
+                    nativeCanvas.drawRoundRect(
+                        rect.left + offsetPx,
+                        rect.top + offsetPx,
+                        rect.right + offsetPx,
+                        rect.bottom + offsetPx,
+                        cornerPx,
+                        cornerPx,
+                        darkPaint
+                    )
+                    nativeCanvas.drawRoundRect(
+                        rect.left - offsetPx,
+                        rect.top - offsetPx,
+                        rect.right - offsetPx,
+                        rect.bottom - offsetPx,
+                        cornerPx,
+                        cornerPx,
+                        lightPaint
+                    )
+                }
             }
         }
     }

@@ -1,11 +1,15 @@
 package com.meditationmixer.core.data.database.entity
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.meditationmixer.core.domain.model.LayerConfig
 import com.meditationmixer.core.domain.model.Preset
 
-@Entity(tableName = "presets")
+@Entity(
+    tableName = "presets",
+    indices = [Index("lastUsedAt"), Index("isFavorite")]
+)
 data class PresetEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
