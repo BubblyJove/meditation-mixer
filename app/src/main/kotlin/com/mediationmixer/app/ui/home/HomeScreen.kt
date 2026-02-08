@@ -79,6 +79,8 @@ fun HomeScreen(
             MainVisual(
                 progress = uiState.progress,
                 isPlaying = uiState.isPlaying,
+                elapsedFormatted = uiState.elapsedFormatted,
+                presetName = uiState.currentPreset?.name ?: "",
                 modifier = Modifier.weight(1f)
             )
 
@@ -177,6 +179,8 @@ private fun HomeHeader(
 private fun MainVisual(
     progress: Float,
     isPlaying: Boolean,
+    elapsedFormatted: String,
+    presetName: String,
     modifier: Modifier = Modifier
 ) {
     val animatedProgress by animateFloatAsState(
@@ -202,11 +206,30 @@ private fun MainVisual(
         ),
         label = "rotation"
     )
+    val breathe by infiniteTransition.animateFloat(
+        initialValue = 0.92f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 3000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "breathe"
+    )
+    val ripplePhase by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2400, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "ripplePhase"
+    )
 
     Box(
         modifier = modifier,
         contentAlignment = Alignment.Center
     ) {
+        // Outer progress ring
         Canvas(modifier = Modifier.size(292.dp)) {
             val startAngle = -90f + if (isPlaying) rotation else 0f
             val sweep = 360f * animatedProgress
@@ -247,6 +270,7 @@ private fun MainVisual(
             }
         }
 
+        // Inner card with visualization
         NeumorphicCard(
             modifier = Modifier.size(268.dp),
             isCircular = true
@@ -258,19 +282,62 @@ private fun MainVisual(
                     .background(MeditationColors.surfaceGradient),
                 contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(220.dp)
-                        .clip(CircleShape)
-                        .background(MeditationColors.accentGradient),
-                    contentAlignment = Alignment.Center
+                // Animated ripple rings (playing) or breathing circle (idle)
+                Canvas(modifier = Modifier.size(220.dp)) {
+                    val centerX = size.width / 2f
+                    val centerY = size.height / 2f
+                    val maxRadius = size.minDimension / 2f
+
+                    if (isPlaying) {
+                        // 4 concentric ripple rings expanding outward
+                        for (i in 0 until 4) {
+                            val phase = (ripplePhase + i * 0.25f) % 1f
+                            val ringRadius = maxRadius * 0.2f + maxRadius * 0.8f * phase
+                            val ringAlpha = (1f - phase) * 0.35f
+                            drawCircle(
+                                color = MeditationColors.accentPrimary.copy(alpha = ringAlpha),
+                                radius = ringRadius,
+                                center = Offset(centerX, centerY),
+                                style = Stroke(width = 2.dp.toPx())
+                            )
+                        }
+                    } else {
+                        // Gentle breathing circle
+                        val breathRadius = maxRadius * 0.5f * breathe
+                        drawCircle(
+                            color = MeditationColors.accentPrimary.copy(alpha = 0.15f),
+                            radius = breathRadius,
+                            center = Offset(centerX, centerY)
+                        )
+                        drawCircle(
+                            color = MeditationColors.accentPrimary.copy(alpha = 0.08f),
+                            radius = breathRadius * 1.3f,
+                            center = Offset(centerX, centerY)
+                        )
+                    }
+                }
+
+                // Text overlay: elapsed time + preset name
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = null,
-                        tint = MeditationColors.textPrimary.copy(alpha = 0.3f),
-                        modifier = Modifier.size(64.dp)
+                    Text(
+                        text = elapsedFormatted,
+                        color = MeditationColors.textPrimary,
+                        fontSize = 36.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
                     )
+                    if (presetName.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = presetName,
+                            color = MeditationColors.textMuted,
+                            fontSize = 13.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             }
         }
