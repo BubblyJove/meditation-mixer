@@ -1,6 +1,7 @@
 package com.meditationmixer.core.domain.usecase
 
 import com.meditationmixer.core.domain.model.LayerType
+import com.meditationmixer.core.domain.model.ToneMode
 import com.meditationmixer.core.domain.repository.AudioRepository
 import com.meditationmixer.core.domain.repository.StreakRepository
 import javax.inject.Inject
@@ -18,7 +19,10 @@ class UpdateLayerUseCase @Inject constructor(
         assetId: String? = null,
         frequency: Float? = null,
         startOffsetMs: Long? = null,
-        binaural: Boolean? = null
+        binaural: Boolean? = null,
+        toneMode: ToneMode? = null,
+        carrierFrequency: Float? = null,
+        modulationDepth: Float? = null
     ) {
         audioRepository.updateLayer(
             type = type,
@@ -29,9 +33,12 @@ class UpdateLayerUseCase @Inject constructor(
             assetId = assetId,
             frequency = frequency,
             startOffsetMs = startOffsetMs,
-            binaural = binaural
+            binaural = binaural,
+            toneMode = toneMode,
+            carrierFrequency = carrierFrequency,
+            modulationDepth = modulationDepth
         )
-        
+
         // Check for importer achievement
         if (type == LayerType.USER_AUDIO && sourceUri != null) {
             streakRepository.unlockAchievement("importer")

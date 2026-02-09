@@ -1,5 +1,6 @@
 package com.meditationmixer.core.domain.usecase
 
+import com.meditationmixer.core.domain.model.ToneMode
 import com.meditationmixer.core.domain.repository.AudioRepository
 import java.io.OutputStream
 import javax.inject.Inject
@@ -12,14 +13,18 @@ class SaveToneUseCase @Inject constructor(
         durationSeconds: Int,
         frequencyHz: Float,
         volume: Float,
-        binaural: Boolean
+        toneMode: ToneMode = ToneMode.AM,
+        carrierFrequency: Float = 200f,
+        modulationDepth: Float = 0.4f
     ) {
         audioRepository.generateToneWav(
             outputStream = outputStream,
             durationSeconds = durationSeconds,
             frequencyHz = frequencyHz,
             volume = volume,
-            binaural = binaural
+            toneMode = toneMode,
+            carrierFrequency = carrierFrequency,
+            modulationDepth = modulationDepth
         )
     }
 }

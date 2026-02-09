@@ -27,7 +27,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -65,7 +64,9 @@ import androidx.compose.ui.unit.sp
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.meditationmixer.core.common.Constants
 import com.meditationmixer.core.domain.model.LayerType
+import com.meditationmixer.core.domain.model.ToneMode
 import com.meditationmixer.core.ui.components.NeumorphicButton
 import com.meditationmixer.core.ui.components.NeumorphicCard
 import com.meditationmixer.core.ui.components.NeumorphicSlider
@@ -198,7 +199,7 @@ fun MixerScreen(
                 LayerCard(
                     icon = Icons.Default.GraphicEq,
                     title = "Tone Generator",
-                    subtitle = "${uiState.toneFrequency.toInt()} Hz",
+                    subtitle = "${uiState.carrierFrequency.toInt()}Hz carrier / ${uiState.toneFrequency.let { if (it < 10f) "%.1f".format(it) else it.toInt().toString() }}Hz beat",
                     volume = uiState.toneVolume,
                     isLooping = true,
                     showLoop = false,
@@ -208,38 +209,67 @@ fun MixerScreen(
                     onVolumeChange = viewModel::setToneVolume,
                     onLoopToggle = { },
                     extraContent = {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Tone mode selector
+                        ToneModeSelector(
+                            selectedMode = uiState.toneMode,
+                            onModeSelected = viewModel::setToneMode
+                        )
+
+                        // Headphones warning for binaural
+                        if (uiState.toneMode == ToneMode.BINAURAL) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 4.dp)
+                            ) {
                                 Icon(
                                     imageVector = Icons.Default.Headphones,
-                                    contentDescription = "Binaural",
-                                    tint = if (uiState.toneBinaural) MeditationColors.accentPrimary else MeditationColors.textMuted,
-                                    modifier = Modifier.size(16.dp)
+                                    contentDescription = null,
+                                    tint = MeditationColors.accentPrimary,
+                                    modifier = Modifier.size(14.dp)
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = "Binaural",
-                                    color = if (uiState.toneBinaural) MeditationColors.textPrimary else MeditationColors.textMuted,
-                                    fontSize = 12.sp
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Switch(
-                                    checked = uiState.toneBinaural,
-                                    onCheckedChange = { viewModel.toggleToneBinaural() },
-                                    colors = SwitchDefaults.colors(
-                                        checkedThumbColor = MeditationColors.accentPrimary,
-                                        checkedTrackColor = MeditationColors.accentDark,
-                                        uncheckedThumbColor = MeditationColors.textMuted,
-                                        uncheckedTrackColor = MeditationColors.surfaceDark
-                                    )
+                                    text = "Headphones required for binaural beats",
+                                    color = MeditationColors.accentPrimary,
+                                    fontSize = 11.sp
                                 )
                             }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Carrier frequency slider
+                        CarrierFrequencySlider(
+                            carrierHz = uiState.carrierFrequency,
+                            onCarrierChange = viewModel::setCarrierFrequency
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Beat frequency slider (renamed from "Frequency")
+                        BeatFrequencySlider(
+                            frequency = uiState.toneFrequency,
+                            onFrequencyChange = viewModel::setToneFrequency
+                        )
+
+                        // Modulation depth slider (AM/Isochronic only)
+                        if (uiState.toneMode == ToneMode.AM || uiState.toneMode == ToneMode.ISOCHRONIC) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            ModulationDepthSlider(
+                                depth = uiState.modulationDepth,
+                                onDepthChange = viewModel::setModulationDepth
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Preview + Save row
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 NeumorphicButton(
                                     onClick = viewModel::toggleTonePreview,
@@ -289,10 +319,6 @@ fun MixerScreen(
                                 }
                             }
                         }
-                        FrequencySlider(
-                            frequency = uiState.toneFrequency,
-                            onFrequencyChange = viewModel::setToneFrequency
-                        )
                     }
                 )
 
@@ -359,6 +385,128 @@ fun MixerScreen(
                 onSelect = { id, name -> viewModel.onAmbienceSelected(id, name) }
             )
         }
+    }
+}
+
+@Composable
+private fun ToneModeSelector(
+    selectedMode: ToneMode,
+    onModeSelected: (ToneMode) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val modes = listOf(
+        ToneMode.AM to "AM",
+        ToneMode.ISOCHRONIC to "Iso",
+        ToneMode.BINAURAL to "Bin",
+        ToneMode.MONAURAL to "Mono"
+    )
+
+    Column(modifier = modifier) {
+        Text(
+            text = "Tone Mode",
+            color = MeditationColors.textMuted,
+            fontSize = 12.sp,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            modes.forEach { (mode, label) ->
+                val isSelected = selectedMode == mode
+                NeumorphicButton(
+                    onClick = { onModeSelected(mode) },
+                    isPressed = isSelected,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(40.dp),
+                    isCircular = false,
+                    cornerRadius = 12.dp
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                if (isSelected) MeditationColors.accentGradient
+                                else MeditationColors.buttonGradient
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = label,
+                            color = if (isSelected) MeditationColors.textPrimary else MeditationColors.textSecondary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CarrierFrequencySlider(
+    carrierHz: Float,
+    onCarrierChange: (Float) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "Carrier Frequency",
+                color = MeditationColors.textMuted,
+                fontSize = 12.sp
+            )
+            Text(
+                text = "${carrierHz.toInt()} Hz",
+                color = MeditationColors.accentPrimary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        NeumorphicSlider(
+            value = ((carrierHz - Constants.MIN_CARRIER_FREQUENCY) / (Constants.MAX_CARRIER_FREQUENCY - Constants.MIN_CARRIER_FREQUENCY)).coerceIn(0f, 1f),
+            onValueChange = { onCarrierChange(it * (Constants.MAX_CARRIER_FREQUENCY - Constants.MIN_CARRIER_FREQUENCY) + Constants.MIN_CARRIER_FREQUENCY) },
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+@Composable
+private fun ModulationDepthSlider(
+    depth: Float,
+    onDepthChange: (Float) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "Modulation Depth",
+                color = MeditationColors.textMuted,
+                fontSize = 12.sp
+            )
+            Text(
+                text = "${(depth * 100).toInt()}%",
+                color = MeditationColors.accentPrimary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        NeumorphicSlider(
+            value = ((depth - Constants.MIN_MODULATION_DEPTH) / (Constants.MAX_MODULATION_DEPTH - Constants.MIN_MODULATION_DEPTH)).coerceIn(0f, 1f),
+            onValueChange = { onDepthChange(it * (Constants.MAX_MODULATION_DEPTH - Constants.MIN_MODULATION_DEPTH) + Constants.MIN_MODULATION_DEPTH) },
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }
 
@@ -767,7 +915,7 @@ private val frequencyPresets = listOf(
 )
 
 @Composable
-private fun FrequencySlider(
+private fun BeatFrequencySlider(
     frequency: Float,
     onFrequencyChange: (Float) -> Unit,
     modifier: Modifier = Modifier
@@ -778,18 +926,18 @@ private fun FrequencySlider(
     }
     val isOnPreset = nearestPreset != null && kotlin.math.abs(nearestPreset.hz - frequency) < 0.5f
 
-    Column(modifier = modifier.padding(top = 12.dp)) {
+    Column(modifier = modifier) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
-                text = "Frequency",
+                text = "Beat Frequency",
                 color = MeditationColors.textMuted,
                 fontSize = 12.sp
             )
             Text(
-                text = if (frequency < 100f) "${"%.1f".format(frequency)} Hz" else "${frequency.toInt()} Hz",
+                text = if (frequency < 10f) "${"%.1f".format(frequency)} Hz beat" else "${frequency.toInt()} Hz beat",
                 color = MeditationColors.accentPrimary,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium
@@ -843,7 +991,7 @@ private fun FrequencySlider(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Fine-tune slider: ±10 Hz around current value, clamped to 1-1000
+        // Fine-tune slider: 1-50 Hz range
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -855,8 +1003,8 @@ private fun FrequencySlider(
             )
             Spacer(modifier = Modifier.width(8.dp))
             NeumorphicSlider(
-                value = ((frequency - 1f) / 999f).coerceIn(0f, 1f),
-                onValueChange = { onFrequencyChange(it * 999f + 1f) },
+                value = ((frequency - Constants.MIN_FREQUENCY) / (Constants.MAX_BEAT_FREQUENCY - Constants.MIN_FREQUENCY)).coerceIn(0f, 1f),
+                onValueChange = { onFrequencyChange(it * (Constants.MAX_BEAT_FREQUENCY - Constants.MIN_FREQUENCY) + Constants.MIN_FREQUENCY) },
                 modifier = Modifier.weight(1f)
             )
         }

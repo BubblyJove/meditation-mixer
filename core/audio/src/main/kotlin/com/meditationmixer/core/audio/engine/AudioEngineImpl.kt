@@ -9,6 +9,7 @@ import com.meditationmixer.core.audio.engine.NoiseGenerator
 import com.meditationmixer.core.domain.model.LayerConfig
 import com.meditationmixer.core.domain.model.LayerType
 import com.meditationmixer.core.domain.model.Preset
+import com.meditationmixer.core.domain.model.ToneMode
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -86,7 +87,9 @@ class AudioEngineImpl @Inject constructor(
                 LayerType.TONE -> {
                     toneEnabled = layer.enabled
                     layer.frequency?.let { toneGenerator.setFrequency(it) }
-                    toneGenerator.setBinaural(layer.binaural)
+                    toneGenerator.setToneMode(layer.toneMode)
+                    toneGenerator.setCarrierFrequency(layer.carrierFrequency)
+                    toneGenerator.setModulationDepth(layer.modulationDepth)
                     toneVolume = layer.volume
                     toneGenerator.setVolume(if (toneEnabled) toneVolume * masterVolume else 0f)
                 }
@@ -358,8 +361,21 @@ class AudioEngineImpl @Inject constructor(
         toneGenerator.setFrequency(frequencyHz)
     }
 
+    override suspend fun setToneMode(mode: ToneMode) {
+        toneGenerator.setToneMode(mode)
+    }
+
+    override suspend fun setCarrierFrequency(hz: Float) {
+        toneGenerator.setCarrierFrequency(hz)
+    }
+
+    override suspend fun setModulationDepth(depth: Float) {
+        toneGenerator.setModulationDepth(depth)
+    }
+
+    @Deprecated("Use setToneMode() instead")
     override suspend fun setToneBinaural(enabled: Boolean) {
-        toneGenerator.setBinaural(enabled)
+        toneGenerator.setToneMode(if (enabled) ToneMode.BINAURAL else ToneMode.AM)
     }
 
     override suspend fun fadeOut(durationMs: Long) {

@@ -9,10 +9,21 @@ object Constants {
     // Timer presets in minutes
     val TIMER_PRESETS = listOf(15, 30, 60, 90, 120, 180)
     
-    // Frequency ranges (Hz)
+    // Beat frequency ranges (Hz) — entrainment frequency
     const val MIN_FREQUENCY = 1f
-    const val MAX_FREQUENCY = 1000f
-    
+    const val MAX_FREQUENCY = 50f
+    const val MAX_BEAT_FREQUENCY = 50f
+
+    // Carrier frequency ranges (Hz) — audible tone
+    const val MIN_CARRIER_FREQUENCY = 80f
+    const val MAX_CARRIER_FREQUENCY = 500f
+    const val DEFAULT_CARRIER_FREQUENCY = 200f
+
+    // Modulation depth (fraction)
+    const val MIN_MODULATION_DEPTH = 0.1f
+    const val MAX_MODULATION_DEPTH = 0.7f
+    const val DEFAULT_MODULATION_DEPTH = 0.4f
+
     // Frequency presets
     object FrequencyPresets {
         const val DELTA_2HZ = 2f

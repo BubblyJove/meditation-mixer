@@ -20,11 +20,21 @@ data class LayerConfig(
     val loop: Boolean = true,
     val frequency: Float? = null,
     val startOffsetMs: Long = 0,
-    val binaural: Boolean = false
+    val binaural: Boolean = false,
+    val toneMode: ToneMode = ToneMode.AM,
+    val carrierFrequency: Float = 200f,
+    val modulationDepth: Float = 0.4f
 )
 
 enum class LayerType {
     TONE,
     USER_AUDIO,
     AMBIENCE
+}
+
+enum class ToneMode {
+    AM,
+    ISOCHRONIC,
+    BINAURAL,
+    MONAURAL
 }

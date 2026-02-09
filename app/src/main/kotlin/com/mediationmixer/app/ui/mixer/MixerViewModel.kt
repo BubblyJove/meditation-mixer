@@ -4,9 +4,11 @@ import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.meditationmixer.core.common.Constants
 import com.meditationmixer.core.domain.model.LayerConfig
 import com.meditationmixer.core.domain.model.LayerType
 import com.meditationmixer.core.domain.model.Preset
+import com.meditationmixer.core.domain.model.ToneMode
 import com.meditationmixer.core.domain.usecase.GetSettingsUseCase
 import com.meditationmixer.core.domain.usecase.PreviewToneUseCase
 import com.meditationmixer.core.domain.usecase.SavePresetUseCase
@@ -34,21 +36,42 @@ class MixerViewModel @Inject constructor(
     val uiState: StateFlow<MixerUiState> = _uiState.asStateFlow()
 
     fun setToneFrequency(frequency: Float) {
-        _uiState.update { it.copy(toneFrequency = frequency.coerceIn(1f, 1000f)) }
+        _uiState.update { it.copy(toneFrequency = frequency.coerceIn(Constants.MIN_FREQUENCY, Constants.MAX_BEAT_FREQUENCY)) }
         viewModelScope.launch {
             updateLayer(LayerType.TONE, frequency = frequency)
-
             if (_uiState.value.isTonePreviewing) {
-                previewTone(frequencyHz = _uiState.value.toneFrequency, volume = _uiState.value.toneVolume)
+                previewCurrentTone()
             }
         }
     }
 
-    fun toggleToneBinaural() {
-        val newBinaural = !_uiState.value.toneBinaural
-        _uiState.update { it.copy(toneBinaural = newBinaural) }
+    fun setToneMode(mode: ToneMode) {
+        _uiState.update { it.copy(toneMode = mode) }
         viewModelScope.launch {
-            updateLayer(LayerType.TONE, binaural = newBinaural)
+            updateLayer(LayerType.TONE, toneMode = mode)
+            if (_uiState.value.isTonePreviewing) {
+                previewCurrentTone()
+            }
+        }
+    }
+
+    fun setCarrierFrequency(hz: Float) {
+        _uiState.update { it.copy(carrierFrequency = hz.coerceIn(Constants.MIN_CARRIER_FREQUENCY, Constants.MAX_CARRIER_FREQUENCY)) }
+        viewModelScope.launch {
+            updateLayer(LayerType.TONE, carrierFrequency = hz)
+            if (_uiState.value.isTonePreviewing) {
+                previewCurrentTone()
+            }
+        }
+    }
+
+    fun setModulationDepth(depth: Float) {
+        _uiState.update { it.copy(modulationDepth = depth.coerceIn(Constants.MIN_MODULATION_DEPTH, Constants.MAX_MODULATION_DEPTH)) }
+        viewModelScope.launch {
+            updateLayer(LayerType.TONE, modulationDepth = depth)
+            if (_uiState.value.isTonePreviewing) {
+                previewCurrentTone()
+            }
         }
     }
 
@@ -64,11 +87,21 @@ class MixerViewModel @Inject constructor(
         _uiState.update { it.copy(toneVolume = volume.coerceIn(0f, 1f)) }
         viewModelScope.launch {
             updateLayer(LayerType.TONE, volume = volume)
-
             if (_uiState.value.isTonePreviewing) {
-                previewTone(frequencyHz = _uiState.value.toneFrequency, volume = _uiState.value.toneVolume)
+                previewCurrentTone()
             }
         }
+    }
+
+    private suspend fun previewCurrentTone() {
+        val state = _uiState.value
+        previewTone(
+            frequencyHz = state.toneFrequency,
+            volume = state.toneVolume,
+            toneMode = state.toneMode,
+            carrierFrequency = state.carrierFrequency,
+            modulationDepth = state.modulationDepth
+        )
     }
 
     fun toggleTonePreview() {
@@ -78,7 +111,7 @@ class MixerViewModel @Inject constructor(
         viewModelScope.launch {
             if (shouldPreview) {
                 runCatching {
-                    previewTone(frequencyHz = _uiState.value.toneFrequency, volume = _uiState.value.toneVolume)
+                    previewCurrentTone()
                 }.onFailure {
                     _uiState.update { it.copy(isTonePreviewing = false, tonePreviewError = "Failed to preview tone") }
                 }
@@ -158,8 +191,6 @@ class MixerViewModel @Inject constructor(
     }
 
     fun importUserAudio() {
-        // This would trigger file picker via Activity result
-        // For now, just update state to show intent
         _uiState.update { it.copy(showFilePicker = true) }
     }
 
@@ -202,22 +233,26 @@ class MixerViewModel @Inject constructor(
     }
 
     fun getToneSaveFilename(): String {
-        val freqLabel = _uiState.value.toneFrequency.toInt()
-        val mode = if (_uiState.value.toneBinaural) "binaural" else "mono"
+        val state = _uiState.value
+        val freqLabel = state.toneFrequency.toInt()
+        val mode = state.toneMode.name.lowercase()
         return "tone_${freqLabel}hz_$mode.wav"
     }
 
     fun saveToneToUri(context: Context, uri: Uri) {
         _uiState.update { it.copy(isSavingTone = true, toneSaveSuccess = false, toneSaveError = null) }
         viewModelScope.launch {
+            val state = _uiState.value
             runCatching {
                 context.contentResolver.openOutputStream(uri)?.use { stream ->
                     saveToneUseCase(
                         outputStream = stream,
                         durationSeconds = 30,
-                        frequencyHz = _uiState.value.toneFrequency,
-                        volume = _uiState.value.toneVolume,
-                        binaural = _uiState.value.toneBinaural
+                        frequencyHz = state.toneFrequency,
+                        volume = state.toneVolume,
+                        toneMode = state.toneMode,
+                        carrierFrequency = state.carrierFrequency,
+                        modulationDepth = state.modulationDepth
                     )
                 } ?: throw IllegalStateException("Could not open output stream")
             }.onSuccess {
@@ -237,35 +272,38 @@ class MixerViewModel @Inject constructor(
             val settings = getSettings().first()
             val timerMs = settings.defaultTimerMinutes.toLong() * 60 * 1000L
             val fadeOutMs = settings.fadeDurationSeconds.toLong() * 1000L
+            val state = _uiState.value
 
             val preset = Preset(
                 id = 0,
-                name = _uiState.value.presetName,
+                name = state.presetName,
                 createdAt = System.currentTimeMillis(),
                 lastUsedAt = System.currentTimeMillis(),
                 layers = listOf(
                     LayerConfig(
                         type = LayerType.TONE,
-                        enabled = _uiState.value.toneEnabled,
-                        volume = _uiState.value.toneVolume,
+                        enabled = state.toneEnabled,
+                        volume = state.toneVolume,
                         loop = true,
-                        frequency = _uiState.value.toneFrequency,
-                        binaural = _uiState.value.toneBinaural
+                        frequency = state.toneFrequency,
+                        toneMode = state.toneMode,
+                        carrierFrequency = state.carrierFrequency,
+                        modulationDepth = state.modulationDepth
                     ),
                     LayerConfig(
                         type = LayerType.USER_AUDIO,
-                        enabled = _uiState.value.userAudioEnabled,
-                        sourceUri = _uiState.value.userAudioUri,
-                        volume = _uiState.value.userAudioVolume,
-                        loop = _uiState.value.userAudioLoop,
-                        startOffsetMs = _uiState.value.userAudioRepeatDelayMs
+                        enabled = state.userAudioEnabled,
+                        sourceUri = state.userAudioUri,
+                        volume = state.userAudioVolume,
+                        loop = state.userAudioLoop,
+                        startOffsetMs = state.userAudioRepeatDelayMs
                     ),
                     LayerConfig(
                         type = LayerType.AMBIENCE,
-                        enabled = _uiState.value.ambienceEnabled,
-                        assetId = _uiState.value.ambienceAssetId,
-                        volume = _uiState.value.ambienceVolume,
-                        loop = _uiState.value.ambienceLoop
+                        enabled = state.ambienceEnabled,
+                        assetId = state.ambienceAssetId,
+                        volume = state.ambienceVolume,
+                        loop = state.ambienceLoop
                     )
                 ),
                 timerDurationMs = timerMs,
@@ -290,18 +328,20 @@ class MixerViewModel @Inject constructor(
 data class MixerUiState(
     val presetName: String = "New Mix",
     val isFavorite: Boolean = false,
-    
+
     // Tone layer
     val toneFrequency: Float = 6f,
     val toneVolume: Float = 0.5f,
     val toneEnabled: Boolean = true,
-    val toneBinaural: Boolean = false,
+    val toneMode: ToneMode = ToneMode.AM,
+    val carrierFrequency: Float = Constants.DEFAULT_CARRIER_FREQUENCY,
+    val modulationDepth: Float = Constants.DEFAULT_MODULATION_DEPTH,
     val isTonePreviewing: Boolean = false,
     val tonePreviewError: String? = null,
     val isSavingTone: Boolean = false,
     val toneSaveSuccess: Boolean = false,
     val toneSaveError: String? = null,
-    
+
     // User audio layer
     val userAudioUri: String? = null,
     val userAudioName: String? = null,
@@ -309,14 +349,14 @@ data class MixerUiState(
     val userAudioLoop: Boolean = true,
     val userAudioEnabled: Boolean = true,
     val userAudioRepeatDelayMs: Long = 0,
-    
+
     // Ambience layer
     val ambienceAssetId: String? = "rain_light",
     val ambienceName: String? = "Light Rain",
     val ambienceVolume: Float = 0.4f,
     val ambienceLoop: Boolean = true,
     val ambienceEnabled: Boolean = true,
-    
+
     // UI state
     val showFilePicker: Boolean = false,
     val showAmbiencePicker: Boolean = false,

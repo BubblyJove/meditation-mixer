@@ -8,6 +8,7 @@ import com.meditationmixer.core.audio.engine.NoiseGenerator
 import com.meditationmixer.core.audio.engine.ToneGenerator
 import com.meditationmixer.core.domain.model.LayerConfig
 import com.meditationmixer.core.domain.model.LayerType
+import com.meditationmixer.core.domain.model.ToneMode
 import com.meditationmixer.core.domain.repository.AudioRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -24,14 +25,14 @@ class AudioRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val audioEngine: AudioEngine
 ) : AudioRepository {
-    
+
     private val _masterVolume = MutableStateFlow(1.0f)
     private var previewPlayer: ExoPlayer? = null
     private val previewToneGenerator = ToneGenerator()
     private val previewNoiseGenerator = NoiseGenerator()
-    
+
     private val layerConfigs = mutableMapOf<LayerType, MutableStateFlow<LayerConfig>>()
-    
+
     init {
         LayerType.entries.forEach { type ->
             layerConfigs[type] = MutableStateFlow(
@@ -39,19 +40,19 @@ class AudioRepositoryImpl @Inject constructor(
             )
         }
     }
-    
+
     override fun getMasterVolume(): Flow<Float> = _masterVolume.asStateFlow()
-    
+
     override fun getLayerConfig(type: LayerType): Flow<LayerConfig> {
-        return layerConfigs[type]?.asStateFlow() 
+        return layerConfigs[type]?.asStateFlow()
             ?: MutableStateFlow(LayerConfig(type = type)).asStateFlow()
     }
-    
+
     override suspend fun setMasterVolume(volume: Float) {
         _masterVolume.value = volume.coerceIn(0f, 1f)
         audioEngine.setMasterVolume(_masterVolume.value)
     }
-    
+
     override suspend fun updateLayer(
         type: LayerType,
         enabled: Boolean?,
@@ -61,7 +62,10 @@ class AudioRepositoryImpl @Inject constructor(
         assetId: String?,
         frequency: Float?,
         startOffsetMs: Long?,
-        binaural: Boolean?
+        binaural: Boolean?,
+        toneMode: ToneMode?,
+        carrierFrequency: Float?,
+        modulationDepth: Float?
     ) {
         val currentConfig = layerConfigs[type]?.value ?: LayerConfig(type = type)
         val updatedConfig = currentConfig.copy(
@@ -72,7 +76,10 @@ class AudioRepositoryImpl @Inject constructor(
             assetId = assetId ?: currentConfig.assetId,
             frequency = frequency ?: currentConfig.frequency,
             startOffsetMs = startOffsetMs ?: currentConfig.startOffsetMs,
-            binaural = binaural ?: currentConfig.binaural
+            binaural = binaural ?: currentConfig.binaural,
+            toneMode = toneMode ?: currentConfig.toneMode,
+            carrierFrequency = carrierFrequency ?: currentConfig.carrierFrequency,
+            modulationDepth = modulationDepth ?: currentConfig.modulationDepth
         )
         layerConfigs[type]?.value = updatedConfig
 
@@ -89,17 +96,26 @@ class AudioRepositoryImpl @Inject constructor(
                 audioEngine.updateToneFrequency(it)
             }
         }
-        binaural?.let {
+        toneMode?.let {
             if (type == LayerType.TONE) {
-                audioEngine.setToneBinaural(it)
+                audioEngine.setToneMode(it)
+            }
+        }
+        carrierFrequency?.let {
+            if (type == LayerType.TONE) {
+                audioEngine.setCarrierFrequency(it)
+            }
+        }
+        modulationDepth?.let {
+            if (type == LayerType.TONE) {
+                audioEngine.setModulationDepth(it)
             }
         }
     }
-    
+
     override suspend fun previewAmbience(assetPath: String) {
         stopPreview()
 
-        // Extract asset ID from path (e.g., "ambience/rain_light.ogg" -> "rain_light")
         val assetId = assetPath
             .substringAfterLast("/")
             .substringBeforeLast(".")
@@ -119,7 +135,7 @@ class AudioRepositoryImpl @Inject constructor(
             previewNoiseGenerator.start()
         }
     }
-    
+
     override suspend fun stopPreview() {
         previewPlayer?.stop()
         previewPlayer?.release()
@@ -127,9 +143,18 @@ class AudioRepositoryImpl @Inject constructor(
         previewNoiseGenerator.stop()
     }
 
-    override suspend fun previewTone(frequencyHz: Float, volume: Float) {
+    override suspend fun previewTone(
+        frequencyHz: Float,
+        volume: Float,
+        toneMode: ToneMode,
+        carrierFrequency: Float,
+        modulationDepth: Float
+    ) {
         previewToneGenerator.setFrequency(frequencyHz)
         previewToneGenerator.setVolume(volume)
+        previewToneGenerator.setToneMode(toneMode)
+        previewToneGenerator.setCarrierFrequency(carrierFrequency)
+        previewToneGenerator.setModulationDepth(modulationDepth)
         previewToneGenerator.start()
     }
 
@@ -142,7 +167,9 @@ class AudioRepositoryImpl @Inject constructor(
         durationSeconds: Int,
         frequencyHz: Float,
         volume: Float,
-        binaural: Boolean
+        toneMode: ToneMode,
+        carrierFrequency: Float,
+        modulationDepth: Float
     ) {
         withContext(Dispatchers.IO) {
             val generator = ToneGenerator()
@@ -151,7 +178,9 @@ class AudioRepositoryImpl @Inject constructor(
                 durationSeconds = durationSeconds,
                 frequencyHz = frequencyHz,
                 volume = volume,
-                binaural = binaural
+                toneMode = toneMode,
+                carrierFreqHz = carrierFrequency,
+                modulationDepth = modulationDepth
             )
         }
     }
