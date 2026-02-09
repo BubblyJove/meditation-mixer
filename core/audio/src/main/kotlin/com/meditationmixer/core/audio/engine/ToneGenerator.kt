@@ -42,6 +42,40 @@ class ToneGenerator {
     private val sampleRate = Constants.SAMPLE_RATE
     private val bufferSize = Constants.AUDIO_BUFFER_SIZE
 
+    companion object {
+        // Gain floor/ceiling — gain never leaves this range
+        private const val GAIN_BASE = 0.88
+        private const val MAX_REAL_DEPTH = 0.25
+
+        // Band-specific max depth (user depth is scaled down to these)
+        private fun maxDepthForBeat(beatHz: Float): Float = when {
+            beatHz <= 4f  -> 0.25f  // Delta
+            beatHz <= 8f  -> 0.20f  // Theta
+            beatHz <= 13f -> 0.25f  // Alpha
+            beatHz <= 30f -> 0.20f  // Beta
+            else          -> 0.15f  // Gamma
+        }
+
+        // Low-carrier scaling — prevents subwoofer wobble
+        private fun carrierScale(carrierHz: Float): Float =
+            if (carrierHz < 200f) 0.7f else 1.0f
+
+        /**
+         * Converts user-facing depth (0.1–0.7) to safe real depth.
+         * Result is the half-amplitude of the sine modulator, so
+         * gain swings between (GAIN_BASE - result) and (GAIN_BASE + result).
+         * Minimum gain ≈ 0.75, maximum gain = 1.0.
+         */
+        fun effectiveDepth(userDepth: Float, beatHz: Float, carrierHz: Float): Double {
+            val bandMax = maxDepthForBeat(beatHz)
+            val clamped = userDepth.coerceAtMost(bandMax)
+            val scaled = clamped * carrierScale(carrierHz)
+            // Map user range to real depth: at max user depth the real depth = MAX_REAL_DEPTH
+            val real = (scaled / 0.70f) * MAX_REAL_DEPTH
+            return real.toDouble().coerceIn(0.0, MAX_REAL_DEPTH.toDouble())
+        }
+    }
+
     fun setFrequency(hz: Float) {
         frequencyHz = hz.coerceIn(Constants.MIN_FREQUENCY, Constants.MAX_FREQUENCY)
     }
@@ -127,21 +161,32 @@ class ToneGenerator {
         }
     }
 
+    /**
+     * AM: gain(t) = base + depth * sin(2π * beat * t)
+     * With post-modulation envelope smoothing (15ms attack, 30ms release).
+     */
     private suspend fun CoroutineScope.generateAmTone() {
         val samples = ShortArray(bufferSize / 2)
         var carrierPhase = 0.0
         var beatPhase = 0.0
+        var smoothedGain = GAIN_BASE
         val twoPi = 2.0 * PI
+        val attackCoeff = 1.0 - kotlin.math.exp(-1.0 / (sampleRate * 0.015))
+        val releaseCoeff = 1.0 - kotlin.math.exp(-1.0 / (sampleRate * 0.030))
 
         while (isActive && _isPlaying.value) {
             val carrierInc = twoPi * carrierHz / sampleRate
             val beatInc = twoPi * frequencyHz / sampleRate
-            val depth = modulationDepth.toDouble()
+            val depth = effectiveDepth(modulationDepth, frequencyHz, carrierHz)
 
             for (i in samples.indices) {
+                val rawGain = GAIN_BASE + depth * sin(beatPhase)
+                // Post-modulation envelope smoothing
+                val coeff = if (rawGain > smoothedGain) attackCoeff else releaseCoeff
+                smoothedGain += coeff * (rawGain - smoothedGain)
+
                 val carrier = sin(carrierPhase)
-                val modulator = 1.0 + depth * sin(beatPhase)
-                val sample = (carrier * modulator * Short.MAX_VALUE).toInt()
+                val sample = (carrier * smoothedGain * Short.MAX_VALUE).toInt()
                     .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
                 samples[i] = sample
 
@@ -155,29 +200,38 @@ class ToneGenerator {
         }
     }
 
+    /**
+     * Isochronic: Uses SINE modulation (not square gate) with the same
+     * base+depth formula as AM but with slightly more aggressive smoothing.
+     * The sine is half-rectified so it pulses on/off but the gain floor
+     * is still constrained to ≥0.75.
+     */
     private suspend fun CoroutineScope.generateIsochronicTone() {
         val samples = ShortArray(bufferSize / 2)
         var carrierPhase = 0.0
         var beatPhase = 0.0
-        var envelope = 0.0
+        var smoothedGain = GAIN_BASE
         val twoPi = 2.0 * PI
-
-        // Smoothing: 15ms attack, 30ms release
         val attackCoeff = 1.0 - kotlin.math.exp(-1.0 / (sampleRate * 0.015))
         val releaseCoeff = 1.0 - kotlin.math.exp(-1.0 / (sampleRate * 0.030))
 
         while (isActive && _isPlaying.value) {
             val carrierInc = twoPi * carrierHz / sampleRate
             val beatInc = twoPi * frequencyHz / sampleRate
+            val depth = effectiveDepth(modulationDepth, frequencyHz, carrierHz)
 
             for (i in samples.indices) {
-                // Square-ish pulse: on when sin(beatPhase) > 0
-                val gate = if (sin(beatPhase) > 0.0) 1.0 else 0.0
-                val coeff = if (gate > envelope) attackCoeff else releaseCoeff
-                envelope += coeff * (gate - envelope)
+                // Half-rectified sine gives pulsing character without hard gate
+                val beatSin = sin(beatPhase)
+                val pulse = if (beatSin > 0.0) beatSin else 0.0
+                // Gain floor is (GAIN_BASE - depth), ceiling is (GAIN_BASE + depth)
+                val rawGain = (GAIN_BASE - depth) + (2.0 * depth) * pulse
+                // Smooth the envelope
+                val coeff = if (rawGain > smoothedGain) attackCoeff else releaseCoeff
+                smoothedGain += coeff * (rawGain - smoothedGain)
 
                 val carrier = sin(carrierPhase)
-                val sample = (carrier * envelope * Short.MAX_VALUE).toInt()
+                val sample = (carrier * smoothedGain * Short.MAX_VALUE).toInt()
                     .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
                 samples[i] = sample
 
@@ -222,21 +276,42 @@ class ToneGenerator {
         }
     }
 
+    /**
+     * Monaural: Two close frequencies summed, but with a gain floor.
+     * Raw sum of sin(f1) + sin(f2) naturally beats between 0 and 2.
+     * We rescale so the floor stays ≥ 0.75.
+     * gain = base + depth * (sum / 2)  where sum is the raw [-2..2] interference.
+     * This keeps the amplitude modulation subtle.
+     */
     private suspend fun CoroutineScope.generateMonauralTone() {
         val samples = ShortArray(bufferSize / 2)
         var leftPhase = 0.0
         var rightPhase = 0.0
+        var smoothedGain = GAIN_BASE
         val twoPi = 2.0 * PI
+        val attackCoeff = 1.0 - kotlin.math.exp(-1.0 / (sampleRate * 0.015))
+        val releaseCoeff = 1.0 - kotlin.math.exp(-1.0 / (sampleRate * 0.030))
 
         while (isActive && _isPlaying.value) {
             val leftFreq = carrierHz.toDouble()
             val rightFreq = (carrierHz + frequencyHz).toDouble()
             val leftIncrement = twoPi * leftFreq / sampleRate
             val rightIncrement = twoPi * rightFreq / sampleRate
+            val depth = effectiveDepth(modulationDepth, frequencyHz, carrierHz)
 
             for (i in samples.indices) {
-                val sample = ((sin(leftPhase) + sin(rightPhase)) * 0.5 * Short.MAX_VALUE)
-                    .toInt().toShort()
+                // Extract carrier from average phase, beat envelope from phase difference
+                val avgPhase = (leftPhase + rightPhase) / 2.0
+                val carrier = sin(avgPhase)
+                // Beat envelope from interference: cos(deltaPhase/2)
+                val beatEnv = kotlin.math.cos((leftPhase - rightPhase) / 2.0)
+                // Map beatEnv [-1..1] to gain [base-depth .. base+depth]
+                val rawGain = GAIN_BASE + depth * beatEnv
+                val coeff = if (rawGain > smoothedGain) attackCoeff else releaseCoeff
+                smoothedGain += coeff * (rawGain - smoothedGain)
+
+                val sample = (carrier * smoothedGain * Short.MAX_VALUE).toInt()
+                    .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
                 samples[i] = sample
 
                 leftPhase += leftIncrement
@@ -367,21 +442,28 @@ class ToneGenerator {
         val twoPi = 2.0 * PI
         var samplesWritten = 0
 
+        val depth = effectiveDepth(modulationDepth, frequencyHz, carrierFreqHz)
+        val attackCoeff = 1.0 - kotlin.math.exp(-1.0 / (sampleRate * 0.015))
+        val releaseCoeff = 1.0 - kotlin.math.exp(-1.0 / (sampleRate * 0.030))
+
         when (toneMode) {
             ToneMode.AM -> {
                 var carrierPhase = 0.0
                 var beatPhase = 0.0
+                var smoothedGain = GAIN_BASE
                 val carrierInc = twoPi * carrierFreqHz / sampleRate
                 val beatInc = twoPi * frequencyHz / sampleRate
-                val depth = modulationDepth.toDouble()
 
                 while (samplesWritten < totalSamples) {
                     val count = minOf(chunkSamples, totalSamples - samplesWritten)
                     val buf = ByteBuffer.allocate(count * numChannels * 2).order(ByteOrder.LITTLE_ENDIAN)
                     for (i in 0 until count) {
+                        val rawGain = GAIN_BASE + depth * sin(beatPhase)
+                        val coeff = if (rawGain > smoothedGain) attackCoeff else releaseCoeff
+                        smoothedGain += coeff * (rawGain - smoothedGain)
+
                         val carrier = sin(carrierPhase)
-                        val modulator = 1.0 + depth * sin(beatPhase)
-                        val sample = (carrier * modulator * vol * Short.MAX_VALUE).toInt()
+                        val sample = (carrier * smoothedGain * vol * Short.MAX_VALUE).toInt()
                             .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
                         buf.putShort(sample)
                         carrierPhase += carrierInc
@@ -397,21 +479,22 @@ class ToneGenerator {
             ToneMode.ISOCHRONIC -> {
                 var carrierPhase = 0.0
                 var beatPhase = 0.0
-                var envelope = 0.0
+                var smoothedGain = GAIN_BASE
                 val carrierInc = twoPi * carrierFreqHz / sampleRate
                 val beatInc = twoPi * frequencyHz / sampleRate
-                val attackCoeff = 1.0 - kotlin.math.exp(-1.0 / (sampleRate * 0.015))
-                val releaseCoeff = 1.0 - kotlin.math.exp(-1.0 / (sampleRate * 0.030))
 
                 while (samplesWritten < totalSamples) {
                     val count = minOf(chunkSamples, totalSamples - samplesWritten)
                     val buf = ByteBuffer.allocate(count * numChannels * 2).order(ByteOrder.LITTLE_ENDIAN)
                     for (i in 0 until count) {
-                        val gate = if (sin(beatPhase) > 0.0) 1.0 else 0.0
-                        val coeff = if (gate > envelope) attackCoeff else releaseCoeff
-                        envelope += coeff * (gate - envelope)
+                        val beatSin = sin(beatPhase)
+                        val pulse = if (beatSin > 0.0) beatSin else 0.0
+                        val rawGain = (GAIN_BASE - depth) + (2.0 * depth) * pulse
+                        val coeff = if (rawGain > smoothedGain) attackCoeff else releaseCoeff
+                        smoothedGain += coeff * (rawGain - smoothedGain)
+
                         val carrier = sin(carrierPhase)
-                        val sample = (carrier * envelope * vol * Short.MAX_VALUE).toInt()
+                        val sample = (carrier * smoothedGain * vol * Short.MAX_VALUE).toInt()
                             .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
                         buf.putShort(sample)
                         carrierPhase += carrierInc
@@ -453,6 +536,7 @@ class ToneGenerator {
             ToneMode.MONAURAL -> {
                 var leftPhase = 0.0
                 var rightPhase = 0.0
+                var smoothedGain = GAIN_BASE
                 val leftFreq = carrierFreqHz.toDouble()
                 val rightFreq = (carrierFreqHz + frequencyHz).toDouble()
                 val leftInc = twoPi * leftFreq / sampleRate
@@ -462,8 +546,15 @@ class ToneGenerator {
                     val count = minOf(chunkSamples, totalSamples - samplesWritten)
                     val buf = ByteBuffer.allocate(count * numChannels * 2).order(ByteOrder.LITTLE_ENDIAN)
                     for (i in 0 until count) {
-                        val sample = ((sin(leftPhase) + sin(rightPhase)) * 0.5 * vol * Short.MAX_VALUE)
-                            .toInt().toShort()
+                        val avgPhase = (leftPhase + rightPhase) / 2.0
+                        val carrier = sin(avgPhase)
+                        val beatEnv = kotlin.math.cos((leftPhase - rightPhase) / 2.0)
+                        val rawGain = GAIN_BASE + depth * beatEnv
+                        val coeff = if (rawGain > smoothedGain) attackCoeff else releaseCoeff
+                        smoothedGain += coeff * (rawGain - smoothedGain)
+
+                        val sample = (carrier * smoothedGain * vol * Short.MAX_VALUE).toInt()
+                            .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
                         buf.putShort(sample)
                         leftPhase += leftInc
                         if (leftPhase >= twoPi) leftPhase -= twoPi

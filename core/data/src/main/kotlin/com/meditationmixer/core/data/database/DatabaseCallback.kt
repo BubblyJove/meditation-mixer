@@ -39,15 +39,15 @@ class DatabaseCallback : RoomDatabase.Callback() {
         )
 
         val presets = listOf(
-            PresetDef("Delta - Deep Sleep", 1.5f, ToneMode.AM, 160f, 0.40f, 0.30f, "rain_light", 0.5f, 30, 30, false),
-            PresetDef("Delta - Heavy Sleep", 2.5f, ToneMode.AM, 140f, 0.45f, 0.30f, "rain_heavy", 0.5f, 30, 30, false),
-            PresetDef("Theta - Calm", 5.0f, ToneMode.AM, 180f, 0.45f, 0.35f, "ocean_waves", 0.4f, 30, 30, false),
-            PresetDef("Theta - Dreamy", 6.0f, ToneMode.AM, 200f, 0.45f, 0.40f, "ocean_waves", 0.4f, 30, 30, true),
-            PresetDef("Alpha - Relax", 8.5f, ToneMode.AM, 200f, 0.40f, 0.30f, "wind_soft", 0.4f, 20, 20, false),
-            PresetDef("Alpha - Flow", 10.0f, ToneMode.AM, 220f, 0.40f, 0.30f, "forest_night", 0.35f, 20, 20, false),
-            PresetDef("Beta - Focus", 14.0f, ToneMode.AM, 220f, 0.30f, 0.25f, "forest_night", 0.3f, 15, 20, false),
-            PresetDef("Beta - Work Mode", 18.0f, ToneMode.AM, 240f, 0.25f, 0.25f, "river_stream", 0.3f, 15, 20, false),
-            PresetDef("Gamma - 40 Hz", 40.0f, ToneMode.AM, 300f, 0.20f, 0.20f, null, 0f, 10, 10, false)
+            PresetDef("Delta - Deep Sleep", 1.5f, ToneMode.AM, 220f, 0.20f, 0.30f, "rain_light", 0.5f, 30, 30, false),
+            PresetDef("Delta - Heavy Sleep", 2.5f, ToneMode.AM, 200f, 0.20f, 0.30f, "rain_heavy", 0.5f, 30, 30, false),
+            PresetDef("Theta - Calm", 5.0f, ToneMode.AM, 230f, 0.15f, 0.35f, "ocean_waves", 0.4f, 30, 30, false),
+            PresetDef("Theta - Dreamy", 6.0f, ToneMode.AM, 230f, 0.12f, 0.40f, "ocean_waves", 0.4f, 30, 30, true),
+            PresetDef("Alpha - Relax", 8.5f, ToneMode.AM, 220f, 0.20f, 0.30f, "wind_soft", 0.4f, 20, 20, false),
+            PresetDef("Alpha - Flow", 10.0f, ToneMode.AM, 240f, 0.20f, 0.30f, "forest_night", 0.35f, 20, 20, false),
+            PresetDef("Beta - Focus", 14.0f, ToneMode.AM, 240f, 0.15f, 0.25f, "forest_night", 0.3f, 15, 20, false),
+            PresetDef("Beta - Work Mode", 18.0f, ToneMode.AM, 260f, 0.15f, 0.25f, "river_stream", 0.3f, 15, 20, false),
+            PresetDef("Gamma - 40 Hz", 40.0f, ToneMode.AM, 300f, 0.10f, 0.20f, null, 0f, 10, 10, false)
         )
 
         presets.forEachIndexed { index, p ->
